@@ -2,12 +2,12 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, enableIndexedDbPersistence, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDEUHfad8GGuml2NwH149EFPd4PT0Z8Ea0",
+  authDomain: "react-firebase-demo-5373a.firebaseapp.com",
+  projectId: "react-firebase-demo-5373a",
+  storageBucket: "react-firebase-demo-5373a.firebasestorage.app",
+  messagingSenderId: "463748735778",
+  appId: "1:463748735778:web:b2cc1593bea191f3e63b7b",
 };
 
 export function getFirebaseApp() {

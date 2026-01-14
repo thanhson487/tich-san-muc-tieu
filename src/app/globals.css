@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: white;
+}
+
+@media (max-width: 640px) {
+  .ant-card {
+    border-radius: 12px;
+  }
+  .ant-card-head-title {
+    font-size: 14px;
+  }
+  h4.ant-typography {
+    font-size: 16px;
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+  .ant-card-body {
+    padding: 12px;
+  }
+  .ant-layout-header {
+    padding: 0 12px !important;
+    line-height: 48px;
+  }
+  .ant-menu {
+    font-size: 12px;
+  }
+  .ant-menu-item {
+    padding-inline: 8px;
+  }
+  .ant-statistic .ant-statistic-title {
+    font-size: 11px;
+  }
+  .ant-statistic .ant-statistic-content {
+    font-size: 16px;
+  }
+  .ant-picker-calendar {
+    font-size: 12px;
+  }
+  .ant-picker-content th,
+  .ant-picker-content td {
+    padding: 0;
+  }
+  .ant-picker-cell .ant-picker-cell-inner {
+    padding: 0;
+  }
+  .ant-picker-calendar-date {
+    border-top: 0 !important;
+    height: 50px !important;
+  }
+  .ant-picker-calendar-date-content {
+    margin-top: 0;
+    height: 20px !important;
+  }
+}
+
+.pulse-gradient {
+  background: linear-gradient(90deg, #10b981 0%, #14b8a6 100%);
+  border: none;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+  transition: transform 0.2s ease;
+  animation: hueRotate 6s linear infinite;
+}
+.pulse-gradient:hover {
+  transform: translateY(-1px);
+}
+@keyframes hueRotate {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+.rainbow-pulse {
+  background: linear-gradient(270deg, #f43f5e, #f59e0b, #10b981, #06b6d4, #6366f1, #a855f7);
+  background-size: 300% 300%;
+  color: #fff;
+  border: none;
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.25);
+  filter: saturate(1.2);
+  animation: gradientShift 5s linear infinite, glowPulse 2s ease-in-out infinite, hueRotate 12s linear infinite;
+}
+.rainbow-pulse:hover {
+  filter: brightness(1.05);
+}
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 6px 16px rgba(99, 102, 241, 0.25); }
+  50% { box-shadow: 0 10px 24px rgba(99, 102, 241, 0.45); }
+}

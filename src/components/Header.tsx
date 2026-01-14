@@ -1,11 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Layout, message, Menu, DatePicker, Switch } from 'antd';
-import { PlusOutlined, CalendarOutlined, TableOutlined } from '@ant-design/icons';
+import { Layout, DatePicker, Switch } from 'antd';
 import { useSavingsStore } from '@/store/useSavingsStore';
-import { useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
 import dayjs from 'dayjs';
 import { useUIStore } from '@/store/useUIStore';
 
@@ -14,24 +11,9 @@ const { Header: AntHeader } = Layout;
 const Header: React.FC = () => {
   const [amount, setAmount] = useState<number | null>(310000);
   const { addTransaction, isLoading, selectedDate, setSelectedDate, fetchTransactions } = useSavingsStore();
-  const router = useRouter();
-  const pathname = usePathname();
   const { isDark, setIsDark } = useUIStore();
   
 
-
-  const menuItems = [
-    {
-      key: '/',
-      icon: <CalendarOutlined />,
-      label: <Link href="/">Lịch</Link>,
-    },
-    {
-      key: '/history',
-      icon: <TableOutlined />,
-      label: <Link href="/history">Chi tiết</Link>,
-    },
-  ];
 
   return (
     <><AntHeader
@@ -54,11 +36,6 @@ const Header: React.FC = () => {
         >
           Tích Lũy
         </h1>
-        <Menu
-          mode="horizontal"
-          selectedKeys={[pathname]}
-          items={menuItems}
-          style={{ borderBottom: 'none', minWidth: '200px' }} />
       </div>
 
       <div className="flex items-center gap-2 flex-wrap justify-center">

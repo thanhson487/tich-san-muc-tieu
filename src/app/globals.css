@@ -91,17 +91,44 @@ body {
   border: none;
   box-shadow: 0 6px 16px rgba(99, 102, 241, 0.25);
   filter: saturate(1.2);
-  animation: gradientShift 5s linear infinite, glowPulse 2s ease-in-out infinite, hueRotate 12s linear infinite;
+  animation:
+    gradientShift 5s linear infinite,
+    glowPulse 2s ease-in-out infinite,
+    hueRotate 12s linear infinite;
 }
 .rainbow-pulse:hover {
   filter: brightness(1.05);
 }
 @keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 @keyframes glowPulse {
-  0%, 100% { box-shadow: 0 6px 16px rgba(99, 102, 241, 0.25); }
-  50% { box-shadow: 0 10px 24px rgba(99, 102, 241, 0.45); }
+  0%,
+  100% {
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.25);
+  }
+  50% {
+    box-shadow: 0 10px 24px rgba(99, 102, 241, 0.45);
+  }
+}
+
+.tabs-equal .ant-tabs-nav {
+  width: 100%;
+}
+.tabs-equal .ant-tabs-nav-list {
+  display: flex;
+  width: 100%;
+}
+.tabs-equal .ant-tabs-tab {
+  flex: 1 0 50%;
+  justify-content: center;
+  margin: 0 !important;
 }

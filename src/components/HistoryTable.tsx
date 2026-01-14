@@ -1,16 +1,21 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Table, Card, Typography, Statistic, Button, Modal, InputNumber, DatePicker, Popconfirm, message, Select } from 'antd';
+import { Table, Card, Typography, Statistic, Button, Modal, InputNumber, DatePicker, Popconfirm, message, Select, Input } from 'antd';
 import { Line } from '@ant-design/plots';
 import { useSavingsStore } from '@/store/useSavingsStore';
 import dayjs from 'dayjs';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const { Title } = Typography;
 
 const HistoryTable: React.FC = () => {
   const { transactions, fetchTransactions, isLoading, updateTransaction, deleteTransaction } = useSavingsStore();
   const [editing, setEditing] = useState<{ id: number | string; amount: number; date: string } | null>(null);
+  const { isAuthed, login } = useAuthStore();
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [username, setUsername] = useState('sonpham');
+  const [password, setPassword] = useState('sonpham');
 
   useEffect(() => {
     fetchTransactions();
@@ -72,6 +77,10 @@ const HistoryTable: React.FC = () => {
             size="small"
             onClick={() => {
               if (!record.id) return;
+              if (!isAuthed) {
+                setLoginOpen(true);
+                return;
+              }
               setEditing({ id: record.id, amount: record.amount, date: record.date });
             }}
           >
@@ -83,6 +92,10 @@ const HistoryTable: React.FC = () => {
             cancelText="Huỷ"
             onConfirm={async () => {
               if (!record.id) return;
+              if (!isAuthed) {
+                setLoginOpen(true);
+                return;
+              }
               await deleteTransaction(record.id);
               message.success('Đã xoá giao dịch');
             }}
@@ -189,6 +202,37 @@ const HistoryTable: React.FC = () => {
             />
           </div>
         )}
+      </Modal>
+      
+      <Modal
+        open={loginOpen}
+        title="Đăng nhập"
+        centered
+        onCancel={() => setLoginOpen(false)}
+        onOk={() => {
+          const ok = login(username, password);
+          if (ok) {
+            setLoginOpen(false);
+            message.success('Đăng nhập thành công');
+          } else {
+            message.error('Sai tài khoản hoặc mật khẩu');
+          }
+        }}
+        okText="Đăng nhập"
+        cancelText="Huỷ"
+      >
+        <div className="flex flex-col gap-3">
+          <Input
+            placeholder="Tài khoản"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <Input.Password
+            placeholder="Mật khẩu"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
       </Modal>
     </div>
   );

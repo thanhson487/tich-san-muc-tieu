@@ -44,9 +44,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           cancelText="Đóng"
         >
           <img
-            src="./../../src/image/biet-thu.jpg"
+            src="/image/biet-thu.jpg"
             alt="Biệt thự"
-            style={{ width: '100%', borderRadius: 12 }}
+            style={{ width: '100%', borderRadius: 12 ,boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)' }}
+        
           />
         </Modal>
       </Layout>

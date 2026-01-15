@@ -6,8 +6,8 @@ interface AuthState {
   logout: () => void;
 }
 
-const USER = process.env.NEXT_PUBLIC_APP_LOGIN_USER || 'sonpham';
-const PASS = process.env.NEXT_PUBLIC_APP_LOGIN_PASS || 'sonpham';
+const USER = process.env.NEXT_PUBLIC_APP_LOGIN_USER || 'sonpham123';
+const PASS = process.env.NEXT_PUBLIC_APP_LOGIN_PASS || 'sonpham123';
 
 export const useAuthStore = create<AuthState>((set) => {
   const initial =

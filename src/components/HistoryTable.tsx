@@ -14,8 +14,8 @@ const HistoryTable: React.FC = () => {
   const [editing, setEditing] = useState<{ id: number | string; amount: number; date: string } | null>(null);
   const { isAuthed, login } = useAuthStore();
   const [loginOpen, setLoginOpen] = useState(false);
-  const [username, setUsername] = useState('sonpham');
-  const [password, setPassword] = useState('sonpham');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     fetchTransactions();

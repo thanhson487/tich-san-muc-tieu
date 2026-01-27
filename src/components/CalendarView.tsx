@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Calendar, Card, Typography, Spin, Statistic, Button, InputNumber, Modal, Input } from 'antd';
+import { Calendar, Card, Typography, Spin, Statistic, Button, InputNumber, Modal, Input, Form } from 'antd';
 import styled from 'styled-components';
 import { Line } from '@ant-design/plots';
 import type { Dayjs } from 'dayjs';
@@ -21,6 +21,9 @@ const CalendarView: React.FC = () => {
   const [loginOpen, setLoginOpen] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [inputAmount, setInputAmount] = useState<number | null>(310000);
+  const [isFocused, setIsFocused] = useState(false);
+  const [form] = Form.useForm();
 
   useEffect(() => {
     fetchTransactions();
@@ -102,7 +105,9 @@ const CalendarView: React.FC = () => {
   }, [transactions, calendarValue]);
   
   const handleSave = async () => {
-    if (!amount) {
+    const formAmount = form.getFieldValue('amount');
+    const useAmount = formAmount ?? inputAmount ?? amount;
+    if (!useAmount) {
       return;
     }
     if (!isAuthed) {
@@ -110,7 +115,7 @@ const CalendarView: React.FC = () => {
       return;
     }
     try {
-      await addTransaction(amount);
+      await addTransaction(useAmount);
     } catch (e: any) {
       // silent, header already shows message on failures; keep simple here
     }
@@ -138,24 +143,37 @@ const CalendarView: React.FC = () => {
             <Title level={4}>Lịch sử tích lũy</Title>
         </div>
         <Card className="mb-3">
-          <Controls>
-            <FullWidthInputNumber
-              value={amount}
-              onChange={setAmount}
-              formatter={(value) => `${value} VND`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => value?.replace(/\s?VND|(,*)/g, '') as unknown as number}
-              min={0}
-            />
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleSave}
-              loading={isLoading}
-              className="rainbow-pulse w-full sm:w-auto"
-            >
-              Tích ngay
-            </Button>
-          </Controls>
+          <Form form={form} initialValues={{ amount: inputAmount ?? amount }}>
+            <Controls>
+              <Form.Item name="amount" rules={[{ required: true, message: 'Nhập số tiền' }]} style={{ marginBottom: 0, flex: 1 }}>
+                <FullWidthInputNumber
+                  formatter={
+                    isFocused
+                      ? undefined
+                      : (value) => (value ? String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '')
+                  }
+                  parser={(value) => value?.replace(/,/g, '') as unknown as number}
+                  min={0}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => {
+                    setIsFocused(false);
+                    const v = form.getFieldValue('amount');
+                    setAmount(v);
+                    setInputAmount(v);
+                  }}
+                />
+              </Form.Item>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleSave}
+                loading={isLoading}
+                className="rainbow-pulse w-full sm:w-auto"
+              >
+                Tích ngay
+              </Button>
+            </Controls>
+          </Form>
         </Card>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <Card className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white" size="small">

@@ -15,7 +15,7 @@ interface AppLayoutProps {
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { isDark } = useUIStore();
   const algorithm = isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm;
-  const [welcomeOpen, setWelcomeOpen] = useState(true);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
   return (
     <ConfigProvider
       locale={viVN}

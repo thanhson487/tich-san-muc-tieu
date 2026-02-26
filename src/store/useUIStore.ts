@@ -6,14 +6,11 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => {
-  const initial =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('isDark') === 'true'
-      : false;
+  const initial = true
   return {
     isDark: initial,
     setIsDark: (v: boolean) => {
-      set({ isDark: v });
+      set({ isDark: true });
       if (typeof window !== 'undefined') {
         localStorage.setItem('isDark', String(v));
       }

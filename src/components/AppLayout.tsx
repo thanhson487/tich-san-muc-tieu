@@ -30,7 +30,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       }}
     >
       <Layout style={{ minHeight: '100vh' }}>
-        <Header />
+        {/* <Header /> */}
         <Content className="px-3 md:px-6" style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
           {children}
         </Content>

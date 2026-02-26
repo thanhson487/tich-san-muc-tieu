@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
- import { Button, Card, Divider, Input, InputNumber, Radio, Tag } from "antd";
+ import { Button, Card, Divider, Input, InputNumber, Radio, Tag, Tabs } from "antd";
 
  const fmt = (n) => (isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2));
  const pf = (s) => {
@@ -127,7 +127,12 @@ import React, { useState, useCallback, useEffect } from "react";
    );
  };
  
- const Page = () => {
+const Page = () => {
+  const PROFILE_LIST_KEY = "tradeProfilesList";
+  const ACTIVE_PROFILE_KEY = "tradeActiveProfileId";
+  const [profiles, setProfiles] = useState([{ id: "default", name: "Profile 1" }]);
+  const [activeProfileId, setActiveProfileId] = useState("default");
+  const [profilesHydrated, setProfilesHydrated] = useState(false);
    const [b1, setB1] = useState("");
    const [b2, setB2] = useState("");
    const [b3, setB3] = useState("");
@@ -143,9 +148,9 @@ import React, { useState, useCallback, useEffect } from "react";
    const [actM4b, setActM4b] = useState("");
    const [actM4s, setActM4s] = useState("");
  
-  const STORAGE_KEY = "tradeToolState";
+ const STORAGE_KEY = `tradeToolState:${activeProfileId}`;
 
-  const clearAll = useCallback(() => {
+ const clearAll = useCallback(() => {
      setB1("");
      setB2("");
      setB3("");
@@ -164,7 +169,61 @@ import React, { useState, useCallback, useEffect } from "react";
         localStorage.removeItem(STORAGE_KEY);
       } catch {}
     }
-   }, []);
+  }, [STORAGE_KEY]);
+
+ useEffect(() => {
+   if (typeof window === "undefined") return;
+   try {
+     const raw = localStorage.getItem(PROFILE_LIST_KEY);
+     if (raw) {
+       const list = JSON.parse(raw);
+       if (Array.isArray(list) && list.length) {
+        setProfiles(list);
+        const activeRaw = localStorage.getItem(ACTIVE_PROFILE_KEY);
+        const fallbackId = list[0].id;
+        const initialId =
+          typeof activeRaw === "string" && list.some((p) => p.id === activeRaw)
+            ? activeRaw
+            : fallbackId;
+        setActiveProfileId(initialId);
+        setProfilesHydrated(true);
+       }
+     } else {
+       localStorage.setItem(PROFILE_LIST_KEY, JSON.stringify(profiles));
+      localStorage.setItem(ACTIVE_PROFILE_KEY, "default");
+      setProfilesHydrated(true);
+     }
+   } catch {}
+ }, []);
+
+ useEffect(() => {
+   if (typeof window === "undefined") return;
+  if (!profilesHydrated) return;
+   try {
+     localStorage.setItem(PROFILE_LIST_KEY, JSON.stringify(profiles));
+   } catch {}
+}, [profiles, profilesHydrated]);
+
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ACTIVE_PROFILE_KEY, activeProfileId);
+  } catch {}
+}, [activeProfileId]);
+
+ const addProfile = () => {
+   const id = `profile-${Date.now()}`;
+   const name = `Profile ${profiles.length + 1}`;
+   const next = [...profiles, { id, name }];
+   setProfiles(next);
+   setActiveProfileId(id);
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(PROFILE_LIST_KEY, JSON.stringify(next));
+      localStorage.setItem(ACTIVE_PROFILE_KEY, id);
+    } catch {}
+  }
+ };
  
    const doCalc = useCallback(() => {
      const r = computeBase(
@@ -204,13 +263,29 @@ import React, { useState, useCallback, useEffect } from "react";
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch {}
     }
-   }, [b1, b2, b3, b4, eb, es, lot]);
+  }, [b1, b2, b3, b4, eb, es, lot, STORAGE_KEY]);
  
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
+      if (!raw) {
+        setB1("");
+        setB2("");
+        setB3("");
+        setB4("");
+        setEb("");
+        setEs("");
+        setLot("0.05");
+        setBase(null);
+        setM3(null);
+        setM4b(false);
+        setM4s(false);
+        setActM3("");
+        setActM4b("");
+        setActM4s("");
+        return;
+      }
       const data = JSON.parse(raw);
       if (data && typeof data === "object") {
         setB1(data.b1 ?? "");
@@ -229,7 +304,7 @@ import React, { useState, useCallback, useEffect } from "react";
         setActM4s(data.actM4s ?? "");
       }
     } catch {}
-  }, []);
+ }, [STORAGE_KEY]);
 
   // Không tự tính toán khi F5; chỉ hiển thị nếu đã có base trong localStorage
 
@@ -471,8 +546,25 @@ import React, { useState, useCallback, useEffect } from "react";
    return (
      <div>
 
-       <div className="h-20"></div>
+       {/* <div className="h-20"></div> */}
        <div className="max-w-4xl mx-auto px-4">
+        <div className="mb-3">
+          <Tabs
+            activeKey={activeProfileId}
+           onChange={(key) => {
+             setActiveProfileId(key);
+             if (typeof window !== "undefined") {
+               try {
+                 localStorage.setItem(ACTIVE_PROFILE_KEY, key);
+               } catch {}
+             }
+           }}
+            items={profiles.map((p) => ({ key: p.id, label: p.name }))}
+          />
+          <div className="flex justify-end">
+            <Button size="small" onClick={addProfile}>Thêm Profile</Button>
+          </div>
+        </div>
          <div className="text-center mb-4">
            <div className="text-blue-200 tracking-widest text-xs">◈ ◈ ◈</div>
            <div className="text-blue-100 font-bold tracking-widest">BONUS FOREX TOOL</div>

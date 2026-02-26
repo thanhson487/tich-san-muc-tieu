@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, ConfigProvider, theme as antdTheme, Modal } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import Header from '@/components/Header';
 import { useUIStore } from '@/store/useUIStore';
+import { useRouter, usePathname } from 'next/navigation';
 
 const { Content } = Layout;
 
@@ -16,6 +17,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { isDark } = useUIStore();
   const algorithm = isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm;
   const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (pathname !== '/trade') {
+      router.replace('/trade');
+    }
+  }, [pathname, router]);
   return (
     <ConfigProvider
       locale={viVN}

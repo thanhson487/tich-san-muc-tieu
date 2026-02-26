@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
- import { Button, Card, Divider, Input, InputNumber, Radio, Tag, Tabs } from "antd";
+ import { Button, Card, Divider, Input, InputNumber, Radio, Tag, Tabs, Modal } from "antd";
+import { useUIStore } from "@/store/useUIStore";
 
  const fmt = (n) => (isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2));
  const pf = (s) => {
@@ -133,6 +134,7 @@ const Page = () => {
   const [profiles, setProfiles] = useState([{ id: "default", name: "Profile 1" }]);
   const [activeProfileId, setActiveProfileId] = useState("default");
   const [profilesHydrated, setProfilesHydrated] = useState(false);
+  const { isDark } = useUIStore ? useUIStore() : { isDark: false };
    const [b1, setB1] = useState("");
    const [b2, setB2] = useState("");
    const [b3, setB3] = useState("");
@@ -147,6 +149,9 @@ const Page = () => {
    const [actM3, setActM3] = useState("");
    const [actM4b, setActM4b] = useState("");
    const [actM4s, setActM4s] = useState("");
+ const [renameOpen, setRenameOpen] = useState(false);
+ const [renameValue, setRenameValue] = useState("");
+ const [renameTargetId, setRenameTargetId] = useState(null);
  
  const STORAGE_KEY = `tradeToolState:${activeProfileId}`;
 
@@ -223,6 +228,58 @@ useEffect(() => {
       localStorage.setItem(ACTIVE_PROFILE_KEY, id);
     } catch {}
   }
+ };
+
+ const openRenameProfile = (id) => {
+   const target = profiles.find((p) => p.id === id);
+   if (!target) return;
+   setRenameTargetId(id);
+   setRenameValue(target.name);
+   setRenameOpen(true);
+ };
+ const confirmRenameProfile = () => {
+   const val = renameValue.trim();
+   if (!val) {
+     setRenameOpen(false);
+     setRenameTargetId(null);
+     return;
+   }
+   const next = profiles.map((p) => (p.id === renameTargetId ? { ...p, name: val } : p));
+   setProfiles(next);
+   if (typeof window !== "undefined") {
+     try {
+       localStorage.setItem(PROFILE_LIST_KEY, JSON.stringify(next));
+     } catch {}
+   }
+   setRenameOpen(false);
+   setRenameTargetId(null);
+ };
+
+ const removeProfile = (id) => {
+   if (profiles.length <= 1) {
+     Modal.warning({ title: "Không thể xoá", centered: true, content: "Phải có ít nhất một profile." });
+     return;
+   }
+   Modal.confirm({
+     title: "Xoá profile?",
+     content: "Dữ liệu của profile này sẽ bị xoá khỏi bộ nhớ.",
+     onOk: () => {
+       const next = profiles.filter((p) => p.id !== id);
+       setProfiles(next);
+       let nextActive = activeProfileId;
+       if (activeProfileId === id) {
+         nextActive = next[0]?.id || "default";
+         setActiveProfileId(nextActive);
+       }
+       if (typeof window !== "undefined") {
+         try {
+           localStorage.setItem(PROFILE_LIST_KEY, JSON.stringify(next));
+           localStorage.setItem(ACTIVE_PROFILE_KEY, nextActive);
+           localStorage.removeItem(`tradeToolState:${id}`);
+         } catch {}
+       }
+     },
+   });
  };
  
    const doCalc = useCallback(() => {
@@ -559,8 +616,26 @@ useEffect(() => {
                } catch {}
              }
            }}
-            items={profiles.map((p) => ({ key: p.id, label: p.name }))}
+            items={profiles.map((p) => ({
+              key: p.id,
+              label: (
+                <div className="flex items-center gap-2">
+                  <span style={{ color: isDark ? "#e5e7eb" : "#111827" }}>{p.name}</span>
+                  <Button size="small" type="link" onClick={(e) => { e.stopPropagation(); openRenameProfile(p.id); }}>Sửa</Button>
+                  <Button size="small" danger type="link" onClick={(e) => { e.stopPropagation(); removeProfile(p.id); }}>Xoá</Button>
+                </div>
+              ),
+            }))}
           />
+          <Modal
+            title="Sửa tên profile"
+            open={renameOpen}
+            onOk={confirmRenameProfile}
+            onCancel={() => { setRenameOpen(false); setRenameTargetId(null); }}
+            centered
+          >
+            <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} />
+          </Modal>
           <div className="flex justify-end">
             <Button size="small" onClick={addProfile}>Thêm Profile</Button>
           </div>

@@ -1,5 +1,5 @@
- "use client";
- import React, { useState, useCallback } from "react";
+"use client";
+import React, { useState, useCallback, useEffect } from "react";
  import { Button, Card, Divider, Input, InputNumber, Radio, Tag } from "antd";
 
  const fmt = (n) => (isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2));
@@ -143,7 +143,9 @@
    const [actM4b, setActM4b] = useState("");
    const [actM4s, setActM4s] = useState("");
  
-   const clearAll = useCallback(() => {
+  const STORAGE_KEY = "tradeToolState";
+
+  const clearAll = useCallback(() => {
      setB1("");
      setB2("");
      setB3("");
@@ -157,6 +159,11 @@
      setActM3("");
      setActM4b("");
      setActM4s("");
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
+    }
    }, []);
  
    const doCalc = useCallback(() => {
@@ -176,19 +183,152 @@
      setActM3("");
      setActM4b("");
      setActM4s("");
+    if (typeof window !== "undefined") {
+      try {
+        const data = {
+          b1,
+          b2,
+          b3,
+          b4,
+          eb,
+          es,
+          lot,
+          base: r,
+          m3: null,
+          m4b: false,
+          m4s: false,
+          actM3: "",
+          actM4b: "",
+          actM4s: ""
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch {}
+    }
    }, [b1, b2, b3, b4, eb, es, lot]);
  
-   const tickM3 = useCallback((type) => {
-     setM3((prev) => {
-       const next = prev === type ? null : type;
-       setM4b(false);
-       setM4s(false);
-       setActM3("");
-       setActM4b("");
-       setActM4s("");
-       return next;
-     });
-   }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data && typeof data === "object") {
+        setB1(data.b1 ?? "");
+        setB2(data.b2 ?? "");
+        setB3(data.b3 ?? "");
+        setB4(data.b4 ?? "");
+        setEb(data.eb ?? "");
+        setEs(data.es ?? "");
+        setLot(data.lot ?? "0.05");
+        setBase(data.base ?? null);
+        setM3(data.m3 ?? null);
+        setM4b(!!data.m4b);
+        setM4s(!!data.m4s);
+        setActM3(data.actM3 ?? "");
+        setActM4b(data.actM4b ?? "");
+        setActM4s(data.actM4s ?? "");
+      }
+    } catch {}
+  }, []);
+
+  // Không tự tính toán khi F5; chỉ hiển thị nếu đã có base trong localStorage
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasInputs =
+      (b1 && b1.trim().length) ||
+      (b2 && b2.trim().length) ||
+      (b3 && b3.trim().length) ||
+      (b4 && b4.trim().length) ||
+      (eb && eb.trim().length) ||
+      (es && es.trim().length);
+    if (!hasInputs && !base) return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const prev = raw ? JSON.parse(raw) : {};
+      const data = {
+        b1: prev.b1 ?? b1,
+        b2: prev.b2 ?? b2,
+        b3: prev.b3 ?? b3,
+        b4: prev.b4 ?? b4,
+        eb: prev.eb ?? eb,
+        es: prev.es ?? es,
+        lot: prev.lot ?? lot,
+        base,
+        m3,
+        m4b,
+        m4s,
+        actM3,
+        actM4b,
+        actM4s
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {}
+  }, [base, m3, m4b, m4s, actM3, actM4b, actM4s, b1, b2, b3, b4, eb, es, lot]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasInputs =
+      (b1 && b1.trim().length) ||
+      (b2 && b2.trim().length) ||
+      (b3 && b3.trim().length) ||
+      (b4 && b4.trim().length) ||
+      (eb && eb.trim().length) ||
+      (es && es.trim().length);
+    if (!hasInputs) return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const prev = raw ? JSON.parse(raw) : {};
+      const data = {
+        ...prev,
+        b1,
+        b2,
+        b3,
+        b4,
+        eb,
+        es,
+        lot
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {}
+  }, [b1, b2, b3, b4, eb, es, lot]);
+
+  const tickM3 = useCallback((type) => {
+    setM3((prev) => {
+      const next = prev === type ? null : type;
+      setM4b(false);
+      setM4s(false);
+      setActM3("");
+      setActM4b("");
+      setActM4s("");
+      const hasInputs =
+        (b1 && b1.trim().length) ||
+        (b2 && b2.trim().length) ||
+        (b3 && b3.trim().length) ||
+        (b4 && b4.trim().length) ||
+        (eb && eb.trim().length) ||
+        (es && es.trim().length);
+      if (hasInputs && typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          const prevData = raw ? JSON.parse(raw) : {};
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              ...prevData,
+              m3: next,
+              m4b: false,
+              m4s: false,
+              actM3: "",
+              actM4b: "",
+              actM4s: ""
+            })
+          );
+        } catch {}
+      }
+      return next;
+    });
+  }, []);
  
    const tickM4Buy = () => {
      if (m4b) {
@@ -196,10 +336,54 @@
        setM4s(false);
        setActM4b("");
        setActM4s("");
+      const hasInputs =
+        (b1 && b1.trim().length) ||
+        (b2 && b2.trim().length) ||
+        (b3 && b3.trim().length) ||
+        (b4 && b4.trim().length) ||
+        (eb && eb.trim().length) ||
+        (es && es.trim().length);
+      if (hasInputs && typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          const prevData = raw ? JSON.parse(raw) : {};
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              ...prevData,
+              m4b: false,
+              m4s: false,
+              actM4b: "",
+              actM4s: ""
+            })
+          );
+        } catch {}
+      }
      } else {
        setM4b(true);
        setM4s(false);
        setActM4s("");
+      const hasInputs =
+        (b1 && b1.trim().length) ||
+        (b2 && b2.trim().length) ||
+        (b3 && b3.trim().length) ||
+        (b4 && b4.trim().length) ||
+        (eb && eb.trim().length) ||
+        (es && es.trim().length);
+      if (hasInputs && typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          const prevData = raw ? JSON.parse(raw) : {};
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              ...prevData,
+              m4b: true,
+              m4s: false
+            })
+          );
+        } catch {}
+      }
      }
    };
  
@@ -209,10 +393,54 @@
        setM4b(false);
        setActM4s("");
        setActM4b("");
+      const hasInputs =
+        (b1 && b1.trim().length) ||
+        (b2 && b2.trim().length) ||
+        (b3 && b3.trim().length) ||
+        (b4 && b4.trim().length) ||
+        (eb && eb.trim().length) ||
+        (es && es.trim().length);
+      if (hasInputs && typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          const prevData = raw ? JSON.parse(raw) : {};
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              ...prevData,
+              m4s: false,
+              m4b: false,
+              actM4s: "",
+              actM4b: ""
+            })
+          );
+        } catch {}
+      }
      } else {
        setM4s(true);
        setM4b(false);
        setActM4b("");
+      const hasInputs =
+        (b1 && b1.trim().length) ||
+        (b2 && b2.trim().length) ||
+        (b3 && b3.trim().length) ||
+        (b4 && b4.trim().length) ||
+        (eb && eb.trim().length) ||
+        (es && es.trim().length);
+      if (hasInputs && typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          const prevData = raw ? JSON.parse(raw) : {};
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              ...prevData,
+              m4s: true,
+              m4b: false
+            })
+          );
+        } catch {}
+      }
      }
    };
  

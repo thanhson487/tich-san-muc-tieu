@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
- import { Button, Card, Divider, Input, InputNumber, Radio, Tag, Tabs, Modal, message } from "antd";
+ import { Button, Card, Divider, Input, InputNumber, Radio, Tag, Tabs, Modal } from "antd";
 import { useUIStore } from "@/store/useUIStore";
 
  const fmt = (n) => (isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2));
@@ -92,16 +92,6 @@ import { useUIStore } from "@/store/useUIStore";
 const DataRow = ({ label, value, type, adjBadge }) => {
    const color =
      type === "sl" ? "#f87171" : type === "tp" ? "#4ade80" : "#fbbf24";
-  const onCopy = () => {
-    const txt =
-      typeof value === "number" && isFinite(value) ? value.toFixed(2) : "";
-    if (!txt) return;
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(txt).then(() => {
-        message.success("Đã copy");
-      });
-    }
-  };
    return (
      <div className="flex justify-between items-center mb-1">
        <div className="flex items-center gap-2">
@@ -112,14 +102,9 @@ const DataRow = ({ label, value, type, adjBadge }) => {
            </Tag>
          )}
        </div>
-      <div className="flex items-center gap-2">
-        <span style={{ color }} className="font-bold tracking-wide">
-          {fmt(value)}
-        </span>
-        <Button size="small" onClick={onCopy}>
-          COPY
-        </Button>
-      </div>
+      <span style={{ color }} className="font-bold tracking-wide">
+        {fmt(value)}
+      </span>
      </div>
    );
  };

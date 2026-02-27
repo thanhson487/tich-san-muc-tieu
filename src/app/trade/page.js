@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
- import { Button, Card, Divider, Input, InputNumber, Radio, Tag, Tabs, Modal } from "antd";
+ import { Button, Card, Divider, Input, InputNumber, Radio, Tag, Tabs, Modal, message } from "antd";
 import { useUIStore } from "@/store/useUIStore";
 
  const fmt = (n) => (isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2));
@@ -8,6 +8,12 @@ import { useUIStore } from "@/store/useUIStore";
    const n = parseFloat(s);
    return !isNaN(n) && n > 0 ? n : 0;
  };
+ 
+ const numOnly = (s) => String(s || "").replace(/[^\d]/g, "");
+ const decOnly = (s) =>
+   String(s || "")
+     .replace(/[^0-9.]/g, "")
+     .replace(/(\..*?)\..*/g, "$1");
  
  function computeBase(b1, b2, b3, b4, eb, es, lot) {
    const so = lot * 100 + 1;
@@ -83,9 +89,19 @@ import { useUIStore } from "@/store/useUIStore";
    };
  }
  
- const DataRow = ({ label, value, type, adjBadge }) => {
+const DataRow = ({ label, value, type, adjBadge }) => {
    const color =
      type === "sl" ? "#f87171" : type === "tp" ? "#4ade80" : "#fbbf24";
+  const onCopy = () => {
+    const txt =
+      typeof value === "number" && isFinite(value) ? value.toFixed(2) : "";
+    if (!txt) return;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(txt).then(() => {
+        message.success("Đã copy");
+      });
+    }
+  };
    return (
      <div className="flex justify-between items-center mb-1">
        <div className="flex items-center gap-2">
@@ -96,12 +112,14 @@ import { useUIStore } from "@/store/useUIStore";
            </Tag>
          )}
        </div>
-       <span
-         style={{ color }}
-         className="font-bold tracking-wide"
-       >
-         {fmt(value)}
-       </span>
+      <div className="flex items-center gap-2">
+        <span style={{ color }} className="font-bold tracking-wide">
+          {fmt(value)}
+        </span>
+        <Button size="small" onClick={onCopy}>
+          COPY
+        </Button>
+      </div>
      </div>
    );
  };
@@ -117,8 +135,10 @@ import { useUIStore } from "@/store/useUIStore";
          </span>
        </div>
        <Input
-         value={value}
-         onChange={(e) => onChange(e.target.value)}
+        value={value}
+        inputMode="decimal"
+        pattern="^[0-9]*[.]?[0-9]*$"
+        onChange={(e) => onChange(decOnly(e.target.value))}
          placeholder="Nhập entry thực tế..."
        />
        <div className="text-[10px] text-yellow-700 mt-1 italic">
@@ -656,19 +676,19 @@ useEffect(() => {
            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
              <div>
                <div className="text-xs text-blue-500 mb-1">MÁY 1 ($)</div>
-               <Input value={b1} onChange={(e) => setB1(e.target.value)} />
+               <Input value={b1} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setB1(numOnly(e.target.value))} />
              </div>
              <div>
                <div className="text-xs text-blue-500 mb-1">MÁY 2 ($)</div>
-               <Input value={b2} onChange={(e) => setB2(e.target.value)} />
+               <Input value={b2} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setB2(numOnly(e.target.value))} />
              </div>
              <div>
                <div className="text-xs text-blue-500 mb-1">MÁY 3 ($)</div>
-               <Input value={b3} onChange={(e) => setB3(e.target.value)} />
+               <Input value={b3} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setB3(numOnly(e.target.value))} />
              </div>
              <div>
                <div className="text-xs text-blue-500 mb-1">MÁY 4 ($)</div>
-               <Input value={b4} onChange={(e) => setB4(e.target.value)} />
+               <Input value={b4} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setB4(numOnly(e.target.value))} />
              </div>
            </div>
          </Card>
@@ -680,16 +700,16 @@ useEffect(() => {
            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
              <div>
                <div className="text-xs text-blue-500 mb-1">ENTRY BUY (MÁY 1)</div>
-               <Input value={eb} onChange={(e) => setEb(e.target.value)} />
+               <Input value={eb} inputMode="decimal" pattern="^[0-9]*[.]?[0-9]*$" onChange={(e) => setEb(decOnly(e.target.value))} />
              </div>
              <div>
                <div className="text-xs text-blue-500 mb-1">ENTRY SELL (MÁY 2)</div>
-               <Input value={es} onChange={(e) => setEs(e.target.value)} />
+               <Input value={es} inputMode="decimal" pattern="^[0-9]*[.]?[0-9]*$" onChange={(e) => setEs(decOnly(e.target.value))} />
              </div>
            </div>
            <div className="mt-2">
              <div className="text-xs text-blue-500 mb-1">LOT SIZE</div>
-             <Input value={lot} onChange={(e) => setLot(e.target.value)} />
+             <Input value={lot} inputMode="decimal" pattern="^[0-9]*[.]?[0-9]*$" onChange={(e) => setLot(decOnly(e.target.value))} />
            </div>
          </Card>
  

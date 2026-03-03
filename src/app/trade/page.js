@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
- import { Button, Card, Divider, Input, InputNumber, Radio, Tag, Tabs, Modal } from "antd";
+ import { Button, Card, Divider, Input, InputNumber, Radio, Tag, Tabs, Modal, Checkbox } from "antd";
 import { useUIStore } from "@/store/useUIStore";
 
  const fmt = (n) => (isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2));
@@ -432,12 +432,23 @@ useEffect(() => {
 
   const tickM3 = useCallback((type) => {
     setM3((prev) => {
-      const next = prev === type ? null : type;
-      setM4b(false);
-      setM4s(false);
+      const wantUntick = prev === type;
+      if (wantUntick && (m4b || m4s)) {
+        return prev;
+      }
+      const next = wantUntick ? null : type;
       setActM3("");
-      setActM4b("");
-      setActM4s("");
+      if (!wantUntick) {
+        setM4b(false);
+        setM4s(false);
+        setActM4b("");
+        setActM4s("");
+      } else {
+        setM4b(false);
+        setM4s(false);
+        setActM4b("");
+        setActM4s("");
+      }
       const hasInputs =
         (b1 && b1.trim().length) ||
         (b2 && b2.trim().length) ||
@@ -465,7 +476,7 @@ useEffect(() => {
       }
       return next;
     });
-  }, []);
+  }, [m4b, m4s, STORAGE_KEY, b1, b2, b3, b4, eb, es]);
  
    const tickM4Buy = () => {
      if (m4b) {
@@ -731,13 +742,19 @@ useEffect(() => {
                </div>
  
                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                 {(m3 === null || m3 === "buy") && (
+                {(m3 === null || m3 === "buy") && (
                    <Card size="small" bodyStyle={{ padding: 10 }}>
                      <div className="flex justify-between items-center mb-2">
                        <div className="text-xs font-semibold" style={{ color: "#4ade80" }}>
                          ▲ BUY LIMIT
                        </div>
-                       <Radio checked={m3 === "buy"} onChange={() => tickM3("buy")} />
+                      <Checkbox
+                        checked={m3 === "buy"}
+                        onChange={(e) => {
+                          if (e.target.checked) tickM3("buy");
+                          else tickM3("buy");
+                        }}
+                      />
                      </div>
                      <DataRow
                        label="SETUP"
@@ -753,13 +770,19 @@ useEffect(() => {
                    </Card>
                  )}
  
-                 {(m3 === null || m3 === "sell") && (
+                {(m3 === null || m3 === "sell") && (
                    <Card size="small" bodyStyle={{ padding: 10 }}>
                      <div className="flex justify-between items-center mb-2">
                        <div className="text-xs font-semibold" style={{ color: "#f87171" }}>
                          ▼ SELL LIMIT
                        </div>
-                       <Radio checked={m3 === "sell"} onChange={() => tickM3("sell")} />
+                      <Checkbox
+                        checked={m3 === "sell"}
+                        onChange={(e) => {
+                          if (e.target.checked) tickM3("sell");
+                          else tickM3("sell");
+                        }}
+                      />
                      </div>
                      <DataRow
                        label="SETUP"
@@ -790,7 +813,12 @@ useEffect(() => {
                        <div className="text-xs font-semibold" style={{ color: "#4ade80" }}>
                          ▲ BUY LIMIT
                        </div>
-                       {m3 && <Radio checked={m4b} onChange={tickM4Buy} />}
+                      {m3 && (
+                        <Checkbox
+                          checked={m4b}
+                          onChange={() => tickM4Buy()}
+                        />
+                      )}
                      </div>
                      <DataRow label="SETUP" value={disp.m4b.setup} type="setup" />
                      <DataRow label="SL" value={disp.m4b.sl} type="sl" />
@@ -804,7 +832,12 @@ useEffect(() => {
                        <div className="text-xs font-semibold" style={{ color: "#f87171" }}>
                          ▼ SELL LIMIT
                        </div>
-                       {m3 && <Radio checked={m4s} onChange={tickM4Sell} />}
+                      {m3 && (
+                        <Checkbox
+                          checked={m4s}
+                          onChange={() => tickM4Sell()}
+                        />
+                      )}
                      </div>
                      <DataRow label="SETUP" value={disp.m4s.setup} type="setup" />
                      <DataRow label="SL" value={disp.m4s.sl} type="sl" />

@@ -186,6 +186,7 @@ const Page = () => {
   const [renameValue, setRenameValue] = useState("");
   const [renameTargetId, setRenameTargetId] = useState(null);
   const [bonusMode, setBonusMode] = useState("20");
+  const [stateHydrated, setStateHydrated] = useState(false);
 
   const STORAGE_KEY = `tradeToolState:${activeProfileId}`;
 
@@ -370,6 +371,7 @@ const Page = () => {
         setActM3("");
         setActM4b("");
         setActM4s("");
+        setStateHydrated(true);
         return;
       }
       const data = JSON.parse(raw);
@@ -391,16 +393,17 @@ const Page = () => {
         setActM4s(data.actM4s ?? "");
       }
     } catch { }
+    setStateHydrated(true);
   }, [STORAGE_KEY]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !stateHydrated) return;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const prev = raw ? JSON.parse(raw) : {};
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...prev, bonusMode }));
     } catch { }
-  }, [bonusMode, STORAGE_KEY]);
+  }, [bonusMode, STORAGE_KEY, stateHydrated]);
 
   // Không tự tính toán khi F5; chỉ hiển thị nếu đã có base trong localStorage
 
@@ -425,6 +428,7 @@ const Page = () => {
         eb: prev.eb ?? eb,
         es: prev.es ?? es,
         lot: prev.lot ?? lot,
+        bonusMode: prev.bonusMode ?? bonusMode,
         base,
         m3,
         m4b,
@@ -435,7 +439,7 @@ const Page = () => {
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch { }
-  }, [base, m3, m4b, m4s, actM3, actM4b, actM4s, b1, b2, b3, b4, eb, es, lot]);
+  }, [base, m3, m4b, m4s, actM3, actM4b, actM4s, b1, b2, b3, b4, eb, es, lot, bonusMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

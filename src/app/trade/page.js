@@ -337,6 +337,7 @@ const Page = () => {
           eb,
           es,
           lot,
+          bonusMode,
           base: r,
           m3: null,
           m4b: false,
@@ -380,6 +381,7 @@ const Page = () => {
         setEb(data.eb ?? "");
         setEs(data.es ?? "");
         setLot(data.lot ?? "0.05");
+        setBonusMode(data.bonusMode ?? "20");
         setBase(data.base ?? null);
         setM3(data.m3 ?? null);
         setM4b(!!data.m4b);
@@ -390,6 +392,15 @@ const Page = () => {
       }
     } catch { }
   }, [STORAGE_KEY]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const prev = raw ? JSON.parse(raw) : {};
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...prev, bonusMode }));
+    } catch { }
+  }, [bonusMode, STORAGE_KEY]);
 
   // Không tự tính toán khi F5; chỉ hiển thị nếu đã có base trong localStorage
 

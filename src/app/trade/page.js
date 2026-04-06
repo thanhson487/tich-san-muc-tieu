@@ -709,13 +709,13 @@ const Page = () => {
               />
               <span className="text-sm font-semibold text-green-400">BONUS 20%</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
+            {/* <label className="flex items-center gap-2 cursor-pointer select-none">
               <Checkbox
                 checked={bonusMode === "50"}
                 onChange={() => { setBonusMode("50"); setBase(null); }}
               />
               <span className="text-sm font-semibold text-yellow-400">BONUS 50%</span>
-            </label>
+            </label> */}
           </div>
           <div className="mt-2 text-[10px] text-blue-400">
             {bonusMode === "20" ? "Đang dùng: Bonus 20% — công thức gốc" : "Đang dùng: Bonus 50% — công thức SL Máy 1 đã điều chỉnh"}

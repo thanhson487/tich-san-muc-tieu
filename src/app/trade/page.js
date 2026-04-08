@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
-import { Button, Card, Divider, Input, Tag, Tabs, Modal, Checkbox, message } from "antd";
+import { Button, Card, Divider, Input, Tag, Tabs, Modal, Checkbox, message, Popover } from "antd";
 import { useUIStore } from "@/store/useUIStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { fbUpsertTradeProfile, fbGetTradeProfiles, fbDeleteTradeProfile } from "@/utils/firebaseDb";
@@ -1186,7 +1186,15 @@ const Page = () => {
           
             <Card className="mb-3" bodyStyle={{ padding: 12 }}>
               <div className="flex justify-between items-center mb-2">
-                <div className="text-sm font-bold text-blue-200">MÁY 3</div>
+                <div className="text-sm font-bold text-blue-200 flex items-center gap-2">
+                  <span>MÁY 3</span>
+                  <Popover
+                    trigger="click"
+                    content={<Machine3Notification m3={m3} base={base} m4b={m4b} m4s={m4s} disp={disp} actM3={actM3} />}
+                  >
+                    <Button size="small">i</Button>
+                  </Popover>
+                </div>
                 {!m3 && <Tag>Pending</Tag>}
                 {m3 === "buy" && !hideMachine3Buy && <Tag color="green">Khớp Buy</Tag>}
                 {m3 === "sell" && !hideMachine3Sell && <Tag color="red">Khớp Sell</Tag>}
@@ -1284,17 +1292,22 @@ const Page = () => {
                 )}
               </div>
 
-              {/* Chỉ hiển thị notification máy 3 khi đã chọn máy 3 */}
-              {m3 && (
-                <Machine3Notification key={notificationKey} m3={m3} base={base} m4b={m4b} m4s={m4s} disp={disp} actM3={actM3} />
-              )}
+              {/* Tooltip thay cho notification máy 3 được gắn ở tiêu đề */}
             </Card>
          
 
             {/* MÁY 4 */}
             <Card className="mb-3" bodyStyle={{ padding: 12 }}>
               <div className="flex justify-between items-center mb-2">
-                <div className="text-sm font-bold text-blue-200">MÁY 4</div>
+                <div className="text-sm font-bold text-blue-200 flex items-center gap-2">
+                  <span>MÁY 4</span>
+                  <Popover
+                    trigger="click"
+                    content={<Machine4Notification m4b={m4b} m4s={m4s} base={base} disp={disp} actM4b={actM4b} actM4s={actM4s} m3={m3} />}
+                  >
+                    <Button size="small">i</Button>
+                  </Popover>
+                </div>
                 <Tag color="gold">{m3 ? "Cập nhật" : "Pending"}</Tag>
               </div>
 
@@ -1364,27 +1377,19 @@ const Page = () => {
                       adjBadge={actM4s && pf(actM4s) > 0}
                     />
                     {m4s && (
-                      <DataRow
-                        label="TP"
-                        value={disp.m1tp + 0.9}
-                        type="tp"
-                        adjBadge={actM4s && pf(actM4s) > 0}
-                      />
-                    )}
+  <DataRow
+    label="TP"
+    value={base.m1sl + 0.9} 
+    type="tp"
+    adjBadge={actM4s && pf(actM4s) > 0}
+  />
+)}
                     <ActualEntryZone visible={m4s} value={actM4s} onChange={onActM4sChange} label="ENTRY THỰC TẾ MÁY 4 SELL" />
                   </Card>
                 )}
               </div>
 
-              <Machine4Notification
-                m4b={m4b}
-                m4s={m4s}
-                base={base}
-                disp={disp}
-                actM4b={actM4b}
-                actM4s={actM4s}
-                m3={m3}
-              />
+              {/* Tooltip thay cho notification máy 4 được gắn ở tiêu đề */}
             </Card>
 
             <div className="text-center text-xs text-blue-400">

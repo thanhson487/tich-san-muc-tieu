@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
-import { Button, Card, Divider, Input,  Tag, Tabs, Modal, Checkbox, message } from "antd";
+import { Button, Card, Divider, Input, Tag, Tabs, Modal, Checkbox, message } from "antd";
 import { useUIStore } from "@/store/useUIStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { fbUpsertTradeProfile, fbGetTradeProfiles, fbDeleteTradeProfile } from "@/utils/firebaseDb";
@@ -75,6 +75,9 @@ function computeFinal(base, m3Match, actM3, actM4b, actM4s) {
   const { range3, range4 } = base;
   let m3_setup;
   let m3_sl;
+  let m3_tp;
+
+  // Tính toán dựa trên entry thực tế hoặc setup mặc định
   if (m3Match === "buy") {
     m3_setup = actM3 > 0 ? actM3 : base.m3b.setup;
     m3_sl = m3_setup - range3;
@@ -82,21 +85,28 @@ function computeFinal(base, m3Match, actM3, actM4b, actM4s) {
     m3_setup = actM3 > 0 ? actM3 : base.m3s.setup;
     m3_sl = m3_setup + range3;
   }
+
   let m4b_setup;
   let m4b_sl;
   let m4s_setup;
   let m4s_sl;
+
   if (m3Match === "buy") {
     m4b_setup = m3_sl + 0.9;
     m4b_sl = m4b_setup - range4;
     m4s_setup = base.m3s.setup;
     m4s_sl = m4s_setup + range4;
+    // TP máy 3 = SL Sell Limit máy 4 - 0.9
+    m3_tp = m4s_sl - 0.9;
   } else {
     m4b_setup = base.m3b.setup;
     m4b_sl = m4b_setup - range4;
     m4s_setup = m3_sl - 0.9;
     m4s_sl = m4s_setup + range4;
+    // TP máy 3 = SL Buy Limit máy 4 + 0.9
+    m3_tp = m4b_sl + 0.9;
   }
+
   if (actM4b > 0) {
     m4b_setup = actM4b;
     m4b_sl = actM4b - range4;
@@ -111,6 +121,7 @@ function computeFinal(base, m3Match, actM3, actM4b, actM4s) {
   return {
     m3_setup,
     m3_sl,
+    m3_tp,
     m4b: { setup: m4b_setup, sl: m4b_sl },
     m4s: { setup: m4s_setup, sl: m4s_sl },
     m1tp,
@@ -139,14 +150,14 @@ const DataRow = ({ label, value, type, adjBadge }) => {
   );
 };
 
-const ActualEntryZone = ({ visible, value, onChange }) => {
+const ActualEntryZone = ({ visible, value, onChange, label }) => {
   if (!visible) return null;
   return (
     <div className="mt-2 p-2 rounded border border-yellow-700 bg-[#0e0a00]">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-yellow-500">⚠</span>
         <span className="text-[10px] tracking-wider text-yellow-700">
-          ENTRY THỰC TẾ (TRƯỢT GIÁ)
+          {label || "ENTRY THỰC TẾ (TRƯỢT GIÁ)"}
         </span>
       </div>
       <Input
@@ -161,6 +172,155 @@ const ActualEntryZone = ({ visible, value, onChange }) => {
       </div>
     </div>
   );
+};
+
+// Component thông báo thay đổi khi chọn máy 3
+const Machine3Notification = ({ m3, base, m4b, m4s, disp, actM3 }) => {
+  if (!m3 || !base || !disp) return null;
+  if(m4b || m4s) return null;
+  const hasActualEntry = actM3 && pf(actM3) > 0;
+  const entryValue = hasActualEntry ? fmt(pf(actM3)) : null;
+
+  if (m3 === "buy") {
+    return (
+      <div className="mt-3 p-3 rounded border border-green-500 bg-green-900/20">
+        <div className="text-green-400 text-xs font-bold mb-2">
+          {hasActualEntry
+            ? `🔄 ĐÃ CẬP NHẬT ENTRY THỰC TẾ MÁY 3 BUY (${entryValue})`
+            : "✅ ĐÃ KÍCH HOẠT BUY LIMIT MÁY 3"}
+        </div>
+        <div className="text-xs text-gray-300 space-y-1">
+          <div>• Đã xóa lệnh Sell Limit máy 3</div>
+
+          <div className="mt-1 font-semibold text-green-300">📊 MÁY 3 (BUY LIMIT):</div>
+          <div className="pl-2">- SETUP: <span className="text-yellow-400">{fmt(disp.m3_setup)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m3_sl)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- TP: <span className="text-green-400">{fmt(disp.m3_tp)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+
+          <div className="mt-1 font-semibold text-green-300">📊 MÁY 4 (BUY LIMIT):</div>
+          <div className="pl-2">- SETUP: <span className="text-yellow-400">{fmt(disp.m4b.setup)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m4b.sl)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          
+          <div className="mt-1 font-semibold text-green-300">📊 MÁY 4 (SELL LIMIT):</div>
+          <div className="pl-2">- SETUP: <span className="text-yellow-400">{fmt(disp.m4s.setup)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m4s.sl)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+
+          <div className="mt-1 font-semibold text-red-300">📊 MÁY 2 (SELL):</div>
+          <div className="pl-2">- TP: <span className="text-green-400">{fmt(disp.m2tp)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (m3 === "sell") {
+    return (
+      <div className="mt-3 p-3 rounded border border-red-500 bg-red-900/20">
+        <div className="text-red-400 text-xs font-bold mb-2">
+          {hasActualEntry
+            ? `🔄 ĐÃ CẬP NHẬT ENTRY THỰC TẾ MÁY 3 SELL (${entryValue})`
+            : "✅ ĐÃ KÍCH HOẠT SELL LIMIT MÁY 3"}
+        </div>
+        <div className="text-xs text-gray-300 space-y-1">
+          <div>• Đã xóa lệnh Buy Limit máy 3</div>
+          
+          <div className="mt-1 font-semibold text-red-300">📊 MÁY 3 (SELL LIMIT):</div>
+          <div className="pl-2">- SETUP: <span className="text-yellow-400">{fmt(disp.m3_setup)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m3_sl)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- TP: <span className="text-green-400">{fmt(disp.m3_tp)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+
+          <div className="mt-1 font-semibold text-red-300">📊 MÁY 4 (BUY LIMIT):</div>
+          <div className="pl-2">- SETUP: <span className="text-yellow-400">{fmt(disp.m4b.setup)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m4b.sl)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          
+          <div className="mt-1 font-semibold text-red-300">📊 MÁY 4 (SELL LIMIT):</div>
+          <div className="pl-2">- SETUP: <span className="text-yellow-400">{fmt(disp.m4s.setup)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m4s.sl)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+
+          <div className="mt-1 font-semibold text-green-300">📊 MÁY 1 (BUY):</div>
+          <div className="pl-2">- TP: <span className="text-green-400">{fmt(disp.m1tp)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+// Component thông báo thay đổi khi chọn máy 4
+const Machine4Notification = ({ m4b, m4s, base, disp, actM4b, actM4s, m3 }) => {
+  if (!base || !disp) return null;
+
+  if (m4b) {
+    const hasActualEntry = actM4b && pf(actM4b) > 0;
+    const entryValue = hasActualEntry ? fmt(pf(actM4b)) : null;
+    // TP máy 4 = SL máy 3 - 0.9
+    const m4_tp = disp.m3_sl - 0.9;
+
+    return (
+      <div className="mt-3 p-3 rounded border border-green-500 bg-green-900/20">
+        <div className="text-green-400 text-xs font-bold mb-2">
+          {hasActualEntry
+            ? `🔄 ĐÃ CẬP NHẬT ENTRY THỰC TẾ MÁY 4 BUY (${entryValue})`
+            : "✅ ĐÃ KÍCH HOẠT BUY LIMIT MÁY 4"}
+        </div>
+        <div className="text-xs text-gray-300 space-y-1">
+          <div>• Đã xóa lệnh Sell Limit máy 4</div>
+
+          <div className="mt-1 font-semibold text-green-300">📊 MÁY 4 (BUY LIMIT):</div>
+          <div className="pl-2">- SETUP: <span className="text-yellow-400">{fmt(disp.m4b.setup)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m4b.sl)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- TP: <span className="text-green-400">{fmt(m4_tp)}</span></div>
+
+          <div className="mt-1 font-semibold text-green-300">📊 MÁY 2 (SELL):</div>
+          <div className="pl-2">- TP: <span className="text-green-400">{fmt(disp.m2tp)}</span></div>
+
+          {m3 === "sell" && (
+            <>
+              <div className="mt-1 font-semibold text-red-300">📊 MÁY 3 (SELL LIMIT):</div>
+              <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m3_sl)}</span></div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (m4s) {
+    const hasActualEntry = actM4s && pf(actM4s) > 0;
+    const entryValue = hasActualEntry ? fmt(pf(actM4s)) : null;
+    // TP máy 4 = SL máy 1 + 0.9
+    const m4_tp = disp.m1tp + 0.9;
+
+    return (
+      <div className="mt-3 p-3 rounded border border-red-500 bg-red-900/20">
+        <div className="text-red-400 text-xs font-bold mb-2">
+          {hasActualEntry
+            ? `🔄 ĐÃ CẬP NHẬT ENTRY THỰC TẾ MÁY 4 SELL (${entryValue})`
+            : "✅ ĐÃ KÍCH HOẠT SELL LIMIT MÁY 4"}
+        </div>
+        <div className="text-xs text-gray-300 space-y-1">
+          <div>• Đã xóa lệnh Buy Limit máy 4</div>
+
+          <div className="mt-1 font-semibold text-red-300">📊 MÁY 4 (SELL LIMIT):</div>
+          <div className="pl-2">- SETUP: <span className="text-yellow-400">{fmt(disp.m4s.setup)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m4s.sl)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- TP: <span className="text-green-400">{fmt(m4_tp)}</span></div>
+
+          <div className="mt-1 font-semibold text-green-300">📊 MÁY 1 (BUY):</div>
+          <div className="pl-2">- TP: <span className="text-green-400">{fmt(disp.m1tp)}</span></div>
+
+          {m3 === "buy" && (
+            <>
+              <div className="mt-1 font-semibold text-green-300">📊 MÁY 3 (BUY LIMIT):</div>
+              <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m3_sl)}</span></div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 };
 
 const Page = () => {
@@ -191,6 +351,8 @@ const Page = () => {
   const [bonusMode, setBonusMode] = useState("20");
   const [stateHydrated, setStateHydrated] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [notificationKey, setNotificationKey] = useState(0);
+
 
   const STORAGE_KEY = `tradeToolState:${activeProfileId}`;
 
@@ -208,6 +370,7 @@ const Page = () => {
     setActM3("");
     setActM4b("");
     setActM4s("");
+    setNotificationKey(prev => prev + 1);
     if (typeof window !== "undefined") {
       try {
         localStorage.removeItem(STORAGE_KEY);
@@ -280,12 +443,12 @@ const Page = () => {
                   setActM3(data2.actM3 ?? "");
                   setActM4b(data2.actM4b ?? "");
                   setActM4s(data2.actM4s ?? "");
-                } catch {}
+                } catch { }
               }
             }
           }
         }
-      } catch {}
+      } catch { }
     })();
   }, [isAuthed, userId]);
 
@@ -308,7 +471,7 @@ const Page = () => {
             });
           }
         }
-      } catch {}
+      } catch { }
     })();
   }, [profilesHydrated, isAuthed, userId]);
 
@@ -392,7 +555,7 @@ const Page = () => {
         if (isAuthed && userId) {
           try {
             fbDeleteTradeProfile(userId, id);
-          } catch {}
+          } catch { }
         }
       },
     });
@@ -409,6 +572,7 @@ const Page = () => {
     setActM3("");
     setActM4b("");
     setActM4s("");
+    setNotificationKey(prev => prev + 1);
     if (typeof window !== "undefined") {
       try {
         const data = {
@@ -486,8 +650,6 @@ const Page = () => {
     } catch { }
   }, [bonusMode, STORAGE_KEY, stateHydrated]);
 
-  // Không tự tính toán khi F5; chỉ hiển thị nếu đã có base trong localStorage
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     const hasInputs =
@@ -557,6 +719,8 @@ const Page = () => {
       }
       const next = wantUntick ? null : type;
       setActM3("");
+      setNotificationKey(prevKey => prevKey + 1);
+
       if (!wantUntick) {
         setM4b(false);
         setM4s(false);
@@ -603,6 +767,7 @@ const Page = () => {
       setM4s(false);
       setActM4b("");
       setActM4s("");
+      setNotificationKey(prev => prev + 1);
       const hasInputs =
         (b1 && b1.trim().length) ||
         (b2 && b2.trim().length) ||
@@ -630,6 +795,7 @@ const Page = () => {
       setM4b(true);
       setM4s(false);
       setActM4s("");
+      setNotificationKey(prev => prev + 1);
       const hasInputs =
         (b1 && b1.trim().length) ||
         (b2 && b2.trim().length) ||
@@ -660,6 +826,7 @@ const Page = () => {
       setM4b(false);
       setActM4s("");
       setActM4b("");
+      setNotificationKey(prev => prev + 1);
       const hasInputs =
         (b1 && b1.trim().length) ||
         (b2 && b2.trim().length) ||
@@ -687,6 +854,7 @@ const Page = () => {
       setM4s(true);
       setM4b(false);
       setActM4b("");
+      setNotificationKey(prev => prev + 1);
       const hasInputs =
         (b1 && b1.trim().length) ||
         (b2 && b2.trim().length) ||
@@ -713,37 +881,40 @@ const Page = () => {
 
   const onActM3Change = (val) => {
     setActM3(val);
+    setNotificationKey(prevKey => prevKey + 1);
     if (typeof window !== "undefined") {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         const prevData = raw ? JSON.parse(raw) : {};
         const data = { ...prevData, actM3: val };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch {}
+      } catch { }
     }
   };
 
   const onActM4bChange = (val) => {
     setActM4b(val);
+    setNotificationKey(prev => prev + 1);
     if (typeof window !== "undefined") {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         const prevData = raw ? JSON.parse(raw) : {};
         const data = { ...prevData, actM4b: val };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch {}
+      } catch { }
     }
   };
 
   const onActM4sChange = (val) => {
     setActM4s(val);
+    setNotificationKey(prev => prev + 1);
     if (typeof window !== "undefined") {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         const prevData = raw ? JSON.parse(raw) : {};
         const data = { ...prevData, actM4s: val };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch {}
+      } catch { }
     }
   };
 
@@ -771,6 +942,56 @@ const Page = () => {
     }
   };
 
+  const refreshFromCloud = async () => {
+    if (!isAuthed || !userId) {
+      message.error("Chưa đăng nhập");
+      return;
+    }
+    try {
+      const items = await fbGetTradeProfiles(userId);
+      if (!Array.isArray(items) || items.length === 0) {
+        message.info("Không có dữ liệu trên cloud");
+        return;
+      }
+      const list = items.map((it) => ({ id: it.id, name: it.name || it.id }));
+      setProfiles(list);
+      const activeRaw = typeof window !== "undefined" ? localStorage.getItem(ACTIVE_PROFILE_KEY) : null;
+      const keepId = activeRaw && list.some((p) => p.id === activeRaw) ? activeRaw : list[0].id;
+      setActiveProfileId(keepId);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(PROFILE_LIST_KEY, JSON.stringify(list));
+        localStorage.setItem(ACTIVE_PROFILE_KEY, keepId);
+        items.forEach((it) => {
+          localStorage.setItem(`tradeToolState:${it.id}`, JSON.stringify(it.state || {}));
+        });
+        const raw2 = localStorage.getItem(`tradeToolState:${keepId}`);
+        if (raw2) {
+          try {
+            const data2 = JSON.parse(raw2);
+            setB1(data2.b1 ?? "");
+            setB2(data2.b2 ?? "");
+            setB3(data2.b3 ?? "");
+            setB4(data2.b4 ?? "");
+            setEb(data2.eb ?? "");
+            setEs(data2.es ?? "");
+            setLot(data2.lot ?? "0.05");
+            setBonusMode(data2.bonusMode ?? "20");
+            setBase(data2.base ?? null);
+            setM3(data2.m3 ?? null);
+            setM4b(!!data2.m4b);
+            setM4s(!!data2.m4s);
+            setActM3(data2.actM3 ?? "");
+            setActM4b(data2.actM4b ?? "");
+            setActM4s(data2.actM4s ?? "");
+          } catch {}
+        }
+      }
+      message.success("Đã lấy dữ liệu mới từ cloud");
+    } catch {
+      message.error("Lấy dữ liệu thất bại");
+    }
+  };
+
   let disp = null;
   if (base) {
     if (m3) {
@@ -786,6 +1007,7 @@ const Page = () => {
       disp = {
         m3_setup: null,
         m3_sl: null,
+        m3_tp: null,
         m4b: base.m4d_b,
         m4s: base.m4d_s,
         m1tp: base.m4d_s.sl - 0.9,
@@ -795,6 +1017,17 @@ const Page = () => {
     }
   }
 
+  // Logic ẩn máy CHÍNH XÁC
+  // Ẩn máy 1 khi: chọn buy máy 3 HOẶC chọn buy máy 4
+  const hideMachine1 = m3 === "buy" || m4b;
+  // Ẩn máy 2 khi: chọn sell máy 3 HOẶC chọn sell máy 4
+  const hideMachine2 = m3 === "sell" || m4s;
+  // Ẩn Buy Limit của máy 3 khi đã chọn Buy máy 4
+  const hideMachine3Buy = m4b;
+  // Ẩn Sell Limit của máy 3 khi đã chọn Sell máy 4
+  const hideMachine3Sell = m4s;
+  console.log(hideMachine3Buy, hideMachine3Sell, m3);
+  // console.log(m3 === "buy" && hideMachine3Buy, m3 === "sell" && hideMachine3Sell);
   return (
     <div>
       <div className="max-w-4xl mx-auto px-4">
@@ -840,6 +1073,13 @@ const Page = () => {
               >
                 Đồng bộ
               </Button>
+              <Button
+                size="small"
+                onClick={refreshFromCloud}
+                style={{ display: mounted && isAuthed ? 'inline-block' : 'none' }}
+              >
+                Làm mới
+              </Button>
             </div>
           </div>
         </div>
@@ -849,7 +1089,6 @@ const Page = () => {
           <div className="text-blue-300 tracking-widest text-[10px]">BY TRAN DUC TOAN</div>
         </div>
 
-        {/* CHỌN CHƯƠNG TRÌNH BONUS */}
         <Card className="mb-3">
           <div className="text-xs tracking-widest text-blue-500 mb-3">▸ CHƯƠNG TRÌNH BONUS</div>
           <div className="flex gap-6">
@@ -860,13 +1099,6 @@ const Page = () => {
               />
               <span className="text-sm font-semibold text-green-400">BONUS 20%</span>
             </label>
-            {/* <label className="flex items-center gap-2 cursor-pointer select-none">
-              <Checkbox
-                checked={bonusMode === "50"}
-                onChange={() => { setBonusMode("50"); setBase(null); }}
-              />
-              <span className="text-sm font-semibold text-yellow-400">BONUS 50%</span>
-            </label> */}
           </div>
           <div className="mt-2 text-[10px] text-blue-400">
             {bonusMode === "20" ? "Đang dùng: Bonus 20% — công thức gốc" : "Đang dùng: Bonus 50% — công thức SL Máy 1 đã điều chỉnh"}
@@ -926,34 +1158,45 @@ const Page = () => {
 
         {disp && base && (
           <div className="mt-4">
-            <Card className="mb-3" bodyStyle={{ padding: 12 }}>
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-sm font-bold text-blue-200">MÁY 1</div>
-                <Tag color="green">BUY</Tag>
-              </div>
-              <DataRow label="SL" value={base.m1sl} type="sl" />
-              <DataRow label="TP" value={disp.m1tp} type="tp" adjBadge={disp.adjusted} />
-            </Card>
+            {/* MÁY 1 - Ẩn khi chọn buy máy 3 hoặc buy máy 4 */}
+            {!hideMachine1 && (
+              <Card className="mb-3" bodyStyle={{ padding: 12 }}>
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-sm font-bold text-blue-200">MÁY 1</div>
+                  <Tag color="green">BUY</Tag>
+                </div>
+                <DataRow label="SL" value={base.m1sl} type="sl" />
+                <DataRow label="TP" value={disp.m1tp} type="tp" adjBadge={disp.adjusted} />
+              </Card>
+            )}
 
-            <Card className="mb-3" bodyStyle={{ padding: 12 }}>
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-sm font-bold text-blue-200">MÁY 2</div>
-                <Tag color="red">SELL</Tag>
-              </div>
-              <DataRow label="SL" value={base.m2sl} type="sl" />
-              <DataRow label="TP" value={disp.m2tp} type="tp" adjBadge={disp.adjusted} />
-            </Card>
+            {/* MÁY 2 - Ẩn khi chọn sell máy 3 hoặc sell máy 4 */}
+            {!hideMachine2 && (
+              <Card className="mb-3" bodyStyle={{ padding: 12 }}>
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-sm font-bold text-blue-200">MÁY 2</div>
+                  <Tag color="red">SELL</Tag>
+                </div>
+                <DataRow label="SL" value={base.m2sl} type="sl" />
+                <DataRow label="TP" value={disp.m2tp} type="tp" adjBadge={disp.adjusted} />
+              </Card>
+            )}
 
+            {/* MÁY 3 - Ẩn hoàn toàn khi đã đi khóa (đã chọn buy/sell) */}
+          
             <Card className="mb-3" bodyStyle={{ padding: 12 }}>
               <div className="flex justify-between items-center mb-2">
                 <div className="text-sm font-bold text-blue-200">MÁY 3</div>
                 {!m3 && <Tag>Pending</Tag>}
-                {m3 === "buy" && <Tag color="green">Khớp Buy</Tag>}
-                {m3 === "sell" && <Tag color="red">Khớp Sell</Tag>}
+                {m3 === "buy" && !hideMachine3Buy && <Tag color="green">Khớp Buy</Tag>}
+                {m3 === "sell" && !hideMachine3Sell && <Tag color="red">Khớp Sell</Tag>}
+                {m3 === "buy" && hideMachine3Buy && <Tag color="gold">ĐÃ BỊ KHÓA</Tag>}
+                {m3 === "sell" && hideMachine3Sell && <Tag color="gold">ĐÃ BỊ KHÓA</Tag>}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {(m3 === null || m3 === "buy") && (
+                {/* Buy Limit máy 3 - Chỉ ẩn khi đã chọn buy máy 4 */}
+                {(m3 === null || m3 === "buy") && !hideMachine3Buy && (
                   <Card size="small" bodyStyle={{ padding: 10 }}>
                     <div className="flex justify-between items-center mb-2">
                       <div className="text-xs font-semibold" style={{ color: "#4ade80" }}>
@@ -971,17 +1214,33 @@ const Page = () => {
                       label="SETUP"
                       value={m3 === "buy" && disp.m3_setup != null ? disp.m3_setup : base.m3b.setup}
                       type="setup"
+                      adjBadge={actM3 && pf(actM3) > 0}
                     />
                     <DataRow
                       label="SL"
                       value={m3 === "buy" && disp.m3_sl != null ? disp.m3_sl : base.m3b.sl}
                       type="sl"
+                      adjBadge={actM3 && pf(actM3) > 0}
                     />
-                    <ActualEntryZone visible={m3 === "buy"} value={actM3} onChange={onActM3Change} />
+                    {m3 === "buy" && disp.m3_tp != null && (
+                      <DataRow label="TP" value={disp.m3_tp} type="tp" adjBadge={actM3 && pf(actM3) > 0} />
+                    )}
+                    <ActualEntryZone visible={m3 === "buy"} value={actM3} onChange={onActM3Change} label="ENTRY THỰC TẾ MÁY 3 BUY" />
                   </Card>
                 )}
 
-                {(m3 === null || m3 === "sell") && (
+                {/* Buy Limit bị khóa do máy 4 buy */}
+                {hideMachine3Buy && (m3 === null || m3 === "buy") && (
+                  <Card size="small" bodyStyle={{ padding: 10 }} className="opacity-60 bg-gray-800">
+                    <div className="text-center text-yellow-500 text-xs py-4">
+                      🔒 BUY LIMIT ĐÃ BỊ KHÓA<br />
+                      Do MÁY 4 đã chọn BUY
+                    </div>
+                  </Card>
+                )}
+
+                {/* Sell Limit máy 3 - Chỉ ẩn khi đã chọn sell máy 4 */}
+                {(m3 === null || m3 === "sell") && !hideMachine3Sell && (
                   <Card size="small" bodyStyle={{ padding: 10 }}>
                     <div className="flex justify-between items-center mb-2">
                       <div className="text-xs font-semibold" style={{ color: "#f87171" }}>
@@ -999,18 +1258,40 @@ const Page = () => {
                       label="SETUP"
                       value={m3 === "sell" && disp.m3_setup != null ? disp.m3_setup : base.m3s.setup}
                       type="setup"
+                      adjBadge={actM3 && pf(actM3) > 0}
                     />
                     <DataRow
                       label="SL"
                       value={m3 === "sell" && disp.m3_sl != null ? disp.m3_sl : base.m3s.sl}
                       type="sl"
+                      adjBadge={actM3 && pf(actM3) > 0}
                     />
-                    <ActualEntryZone visible={m3 === "sell"} value={actM3} onChange={onActM3Change} />
+                    {m3 === "sell" && disp.m3_tp != null && (
+                      <DataRow label="TP" value={disp.m3_tp} type="tp" adjBadge={actM3 && pf(actM3) > 0} />
+                    )}
+                    <ActualEntryZone visible={m3 === "sell"} value={actM3} onChange={onActM3Change} label="ENTRY THỰC TẾ MÁY 3 SELL" />
+                  </Card>
+                )}
+
+                {/* Sell Limit bị khóa do máy 4 sell */}
+                {hideMachine3Sell && (m3 === null || m3 === "sell") && (
+                  <Card size="small" bodyStyle={{ padding: 10 }} className="opacity-60 bg-gray-800">
+                    <div className="text-center text-yellow-500 text-xs py-4">
+                      🔒 SELL LIMIT ĐÃ BỊ KHÓA<br />
+                      Do MÁY 4 đã chọn SELL
+                    </div>
                   </Card>
                 )}
               </div>
-            </Card>
 
+              {/* Chỉ hiển thị notification máy 3 khi đã chọn máy 3 */}
+              {m3 && (
+                <Machine3Notification key={notificationKey} m3={m3} base={base} m4b={m4b} m4s={m4s} disp={disp} actM3={actM3} />
+              )}
+            </Card>
+         
+
+            {/* MÁY 4 */}
             <Card className="mb-3" bodyStyle={{ padding: 12 }}>
               <div className="flex justify-between items-center mb-2">
                 <div className="text-sm font-bold text-blue-200">MÁY 4</div>
@@ -1018,44 +1299,92 @@ const Page = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Buy Limit máy 4 - Ẩn khi đã chọn Sell Limit máy 4 */}
                 {!m4s && (
                   <Card size="small" bodyStyle={{ padding: 10 }}>
                     <div className="flex justify-between items-center mb-2">
                       <div className="text-xs font-semibold" style={{ color: "#4ade80" }}>
                         ▲ BUY LIMIT
                       </div>
-                      {m3 && (
+                      {m3 && !m4s && (
                         <Checkbox
                           checked={m4b}
                           onChange={() => tickM4Buy()}
                         />
                       )}
                     </div>
-                    <DataRow label="SETUP" value={disp.m4b.setup} type="setup" />
-                    <DataRow label="SL" value={disp.m4b.sl} type="sl" />
-                    <ActualEntryZone visible={m4b} value={actM4b} onChange={onActM4bChange} />
+                    <DataRow
+                      label="SETUP"
+                      value={disp.m4b.setup}
+                      type="setup"
+                      adjBadge={actM4b && pf(actM4b) > 0}
+                    />
+                    <DataRow
+                      label="SL"
+                      value={disp.m4b.sl}
+                      type="sl"
+                      adjBadge={actM4b && pf(actM4b) > 0}
+                    />
+                    {m4b && (
+                      <DataRow
+                        label="TP"
+                        value={disp.m3_sl - 0.9}
+                        type="tp"
+                        adjBadge={actM4b && pf(actM4b) > 0}
+                      />
+                    )}
+                    <ActualEntryZone visible={m4b} value={actM4b} onChange={onActM4bChange} label="ENTRY THỰC TẾ MÁY 4 BUY" />
                   </Card>
                 )}
 
+                {/* Sell Limit máy 4 - Ẩn khi đã chọn Buy Limit máy 4 */}
                 {!m4b && (
                   <Card size="small" bodyStyle={{ padding: 10 }}>
                     <div className="flex justify-between items-center mb-2">
                       <div className="text-xs font-semibold" style={{ color: "#f87171" }}>
                         ▼ SELL LIMIT
                       </div>
-                      {m3 && (
+                      {m3 && !m4b && (
                         <Checkbox
                           checked={m4s}
                           onChange={() => tickM4Sell()}
                         />
                       )}
                     </div>
-                    <DataRow label="SETUP" value={disp.m4s.setup} type="setup" />
-                    <DataRow label="SL" value={disp.m4s.sl} type="sl" />
-                    <ActualEntryZone visible={m4s} value={actM4s} onChange={onActM4sChange} />
+                    <DataRow
+                      label="SETUP"
+                      value={disp.m4s.setup}
+                      type="setup"
+                      adjBadge={actM4s && pf(actM4s) > 0}
+                    />
+                    <DataRow
+                      label="SL"
+                      value={disp.m4s.sl}
+                      type="sl"
+                      adjBadge={actM4s && pf(actM4s) > 0}
+                    />
+                    {m4s && (
+                      <DataRow
+                        label="TP"
+                        value={disp.m1tp + 0.9}
+                        type="tp"
+                        adjBadge={actM4s && pf(actM4s) > 0}
+                      />
+                    )}
+                    <ActualEntryZone visible={m4s} value={actM4s} onChange={onActM4sChange} label="ENTRY THỰC TẾ MÁY 4 SELL" />
                   </Card>
                 )}
               </div>
+
+              <Machine4Notification
+                m4b={m4b}
+                m4s={m4s}
+                base={base}
+                disp={disp}
+                actM4b={actM4b}
+                actM4s={actM4s}
+                m3={m3}
+              />
             </Card>
 
             <div className="text-center text-xs text-blue-400">

@@ -1,34 +1,52 @@
 import { create } from 'zustand';
+import users from '@/data/user.json';
 
 interface AuthState {
   isAuthed: boolean;
+  userId: string | null;
   login: (username: string, password: string) => boolean;
   logout: () => void;
 }
-
-const USER = process.env.NEXT_PUBLIC_APP_LOGIN_USER || 'sonpham123';
-const PASS = process.env.NEXT_PUBLIC_APP_LOGIN_PASS || 'sonpham123';
 
 export const useAuthStore = create<AuthState>((set) => {
   const initial =
     typeof window !== 'undefined'
       ? localStorage.getItem('isAuthed') === 'true'
       : false;
+  const initialUser =
+    typeof window !== 'undefined' ? localStorage.getItem('userId') || null : null;
   return {
     isAuthed: initial,
+    userId: initialUser,
     login: (username: string, password: string) => {
-      const ok = username === USER && password === PASS;
+      const ok = Array.isArray(users)
+        ? users.some((u: any) => String(u?.username) === username && String(u?.password) === password)
+        : false;
       if (ok && typeof window !== 'undefined') {
         localStorage.setItem('isAuthed', 'true');
-        set({ isAuthed: true });
+        localStorage.setItem('userId', username);
+        set({ isAuthed: true, userId: username });
       }
       return ok;
     },
     logout: () => {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('isAuthed');
+        localStorage.removeItem('userId');
+        try {
+          const listRaw = localStorage.getItem('tradeProfilesList');
+          const list = listRaw ? JSON.parse(listRaw) : [];
+          if (Array.isArray(list)) {
+            list.forEach((p: any) => {
+              const id = String(p?.id || '');
+              if (id) localStorage.removeItem(`tradeToolState:${id}`);
+            });
+          }
+        } catch {}
+        localStorage.removeItem('tradeProfilesList');
+        localStorage.removeItem('tradeActiveProfileId');
       }
-      set({ isAuthed: false });
+      set({ isAuthed: false, userId: null });
     },
   };
 });

@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Layout, ConfigProvider, theme as antdTheme, Modal } from 'antd';
+import { Layout, ConfigProvider, theme as antdTheme, Modal, Input, Button, message } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import Header from '@/components/Header';
 import { useUIStore } from '@/store/useUIStore';
 import { useRouter, usePathname } from 'next/navigation';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const { Content } = Layout;
 
@@ -19,12 +20,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [welcomeOpen, setWelcomeOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const { isAuthed, login, logout } = useAuthStore();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     if (pathname !== '/trade') {
       router.replace('/trade');
     }
   }, [pathname, router]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   return (
     <ConfigProvider
       locale={viVN}
@@ -40,9 +48,57 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     >
       <Layout style={{ minHeight: '100vh' }}>
         {/* <Header /> */}
-        <Content className="px-3 md:px-6" style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+        <Content
+          className="px-3 md:px-6"
+          style={{
+            maxWidth: '1200px',
+            margin: '0 auto',
+            width: '100%',
+            display: mounted && isAuthed ? 'block' : 'none',
+          }}
+        >
           {children}
         </Content>
+        <div
+          style={{
+            position: 'fixed',
+            top: 12,
+            right: 12,
+            zIndex: 1100,
+            display: mounted && isAuthed ? 'block' : 'none',
+          }}
+        >
+          <Button size="small" onClick={logout}>Đăng xuất</Button>
+        </div>
+        <Modal
+          open={mounted ? !isAuthed : false}
+          title="Đăng nhập"
+          centered
+          closable={false}
+          maskClosable={false}
+          onOk={() => {
+            const ok = login(username, password);
+            if (!ok) {
+              message.error('Sai tài khoản hoặc mật khẩu');
+              return;
+            }
+          }}
+          okText="Đăng nhập"
+          cancelButtonProps={{ style: { display: 'none' } }}
+        >
+          <div className="flex flex-col gap-3">
+            <Input
+              placeholder="Tài khoản"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <Input.Password
+              placeholder="Mật khẩu"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+        </Modal>
         <Modal
           open={welcomeOpen}
           onCancel={() => setWelcomeOpen(false)}

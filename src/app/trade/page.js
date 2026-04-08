@@ -1,7 +1,9 @@
 "use client";
 import React, { useState, useCallback, useEffect } from "react";
-import { Button, Card, Divider, Input, InputNumber, Radio, Tag, Tabs, Modal, Checkbox } from "antd";
+import { Button, Card, Divider, Input,  Tag, Tabs, Modal, Checkbox, message } from "antd";
 import { useUIStore } from "@/store/useUIStore";
+import { useAuthStore } from "@/store/useAuthStore";
+import { fbUpsertTradeProfile, fbGetTradeProfiles, fbDeleteTradeProfile } from "@/utils/firebaseDb";
 
 const fmt = (n) => (isNaN(n) || !isFinite(n) ? "—" : n.toFixed(2));
 const pf = (s) => {
@@ -168,6 +170,7 @@ const Page = () => {
   const [activeProfileId, setActiveProfileId] = useState("default");
   const [profilesHydrated, setProfilesHydrated] = useState(false);
   const { isDark } = useUIStore ? useUIStore() : { isDark: false };
+  const { isAuthed, userId } = useAuthStore ? useAuthStore() : { isAuthed: false, userId: null };
   const [b1, setB1] = useState("");
   const [b2, setB2] = useState("");
   const [b3, setB3] = useState("");
@@ -187,6 +190,7 @@ const Page = () => {
   const [renameTargetId, setRenameTargetId] = useState(null);
   const [bonusMode, setBonusMode] = useState("20");
   const [stateHydrated, setStateHydrated] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const STORAGE_KEY = `tradeToolState:${activeProfileId}`;
 
@@ -235,6 +239,78 @@ const Page = () => {
       }
     } catch { }
   }, []);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  useEffect(() => {
+    if (!isAuthed || !userId) return;
+    (async () => {
+      try {
+        const items = await fbGetTradeProfiles(userId);
+        if (Array.isArray(items) && items.length) {
+          const list = items.map((it) => ({ id: it.id, name: it.name || it.id }));
+          setProfiles(list);
+          const activeRaw = typeof window !== "undefined" ? localStorage.getItem(ACTIVE_PROFILE_KEY) : null;
+          const keepId = activeRaw && list.some((p) => p.id === activeRaw) ? activeRaw : list[0].id;
+          setActiveProfileId(keepId);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(PROFILE_LIST_KEY, JSON.stringify(list));
+            localStorage.setItem(ACTIVE_PROFILE_KEY, keepId);
+            items.forEach((it) => {
+              localStorage.setItem(`tradeToolState:${it.id}`, JSON.stringify(it.state || {}));
+            });
+            if (keepId === activeProfileId) {
+              const raw2 = localStorage.getItem(`tradeToolState:${keepId}`);
+              if (raw2) {
+                try {
+                  const data2 = JSON.parse(raw2);
+                  setB1(data2.b1 ?? "");
+                  setB2(data2.b2 ?? "");
+                  setB3(data2.b3 ?? "");
+                  setB4(data2.b4 ?? "");
+                  setEb(data2.eb ?? "");
+                  setEs(data2.es ?? "");
+                  setLot(data2.lot ?? "0.05");
+                  setBonusMode(data2.bonusMode ?? "20");
+                  setBase(data2.base ?? null);
+                  setM3(data2.m3 ?? null);
+                  setM4b(!!data2.m4b);
+                  setM4s(!!data2.m4s);
+                  setActM3(data2.actM3 ?? "");
+                  setActM4b(data2.actM4b ?? "");
+                  setActM4s(data2.actM4s ?? "");
+                } catch {}
+              }
+            }
+          }
+        }
+      } catch {}
+    })();
+  }, [isAuthed, userId]);
+
+  useEffect(() => {
+    if (!profilesHydrated || !isAuthed || !userId) return;
+    (async () => {
+      try {
+        const items = await fbGetTradeProfiles(userId);
+        if (Array.isArray(items) && items.length) {
+          const list = items.map((it) => ({ id: it.id, name: it.name || it.id }));
+          setProfiles(list);
+          const activeRaw = typeof window !== "undefined" ? localStorage.getItem(ACTIVE_PROFILE_KEY) : null;
+          const keepId = activeRaw && list.some((p) => p.id === activeRaw) ? activeRaw : list[0].id;
+          setActiveProfileId(keepId);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(PROFILE_LIST_KEY, JSON.stringify(list));
+            localStorage.setItem(ACTIVE_PROFILE_KEY, keepId);
+            items.forEach((it) => {
+              localStorage.setItem(`tradeToolState:${it.id}`, JSON.stringify(it.state || {}));
+            });
+          }
+        }
+      } catch {}
+    })();
+  }, [profilesHydrated, isAuthed, userId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -312,6 +388,11 @@ const Page = () => {
             localStorage.setItem(ACTIVE_PROFILE_KEY, nextActive);
             localStorage.removeItem(`tradeToolState:${id}`);
           } catch { }
+        }
+        if (isAuthed && userId) {
+          try {
+            fbDeleteTradeProfile(userId, id);
+          } catch {}
         }
       },
     });
@@ -630,6 +711,66 @@ const Page = () => {
     }
   };
 
+  const onActM3Change = (val) => {
+    setActM3(val);
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const prevData = raw ? JSON.parse(raw) : {};
+        const data = { ...prevData, actM3: val };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch {}
+    }
+  };
+
+  const onActM4bChange = (val) => {
+    setActM4b(val);
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const prevData = raw ? JSON.parse(raw) : {};
+        const data = { ...prevData, actM4b: val };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch {}
+    }
+  };
+
+  const onActM4sChange = (val) => {
+    setActM4s(val);
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const prevData = raw ? JSON.parse(raw) : {};
+        const data = { ...prevData, actM4s: val };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch {}
+    }
+  };
+
+  const syncAll = async () => {
+    if (!isAuthed || !userId) {
+      message.error("Chưa đăng nhập");
+      return;
+    }
+    try {
+      const localIds = profiles.map((p) => p.id);
+      const ops = profiles.map((p) => {
+        const raw = typeof window !== "undefined" ? localStorage.getItem(`tradeToolState:${p.id}`) : null;
+        const state = raw ? JSON.parse(raw) : {};
+        return fbUpsertTradeProfile(userId, { id: p.id, name: p.name, state });
+      });
+      const remote = await fbGetTradeProfiles(userId);
+      const toDelete = (remote || []).filter((r) => !localIds.includes(r.id));
+      for (const r of toDelete) {
+        await fbDeleteTradeProfile(userId, r.id);
+      }
+      await Promise.all(ops);
+      message.success("Đồng bộ thành công");
+    } catch {
+      message.error("Đồng bộ thất bại");
+    }
+  };
+
   let disp = null;
   if (base) {
     if (m3) {
@@ -689,7 +830,17 @@ const Page = () => {
             <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} />
           </Modal>
           <div className="flex justify-end">
-            <Button size="small" onClick={addProfile}>Thêm Profile</Button>
+            <div className="flex items-center gap-2">
+              <Button size="small" onClick={addProfile}>Thêm Profile</Button>
+              <Button
+                size="small"
+                type="primary"
+                onClick={syncAll}
+                style={{ display: mounted && isAuthed ? 'inline-block' : 'none' }}
+              >
+                Đồng bộ
+              </Button>
+            </div>
           </div>
         </div>
         <div className="text-center mb-4">
@@ -709,13 +860,13 @@ const Page = () => {
               />
               <span className="text-sm font-semibold text-green-400">BONUS 20%</span>
             </label>
-            {/* <label className="flex items-center gap-2 cursor-pointer select-none">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
               <Checkbox
                 checked={bonusMode === "50"}
                 onChange={() => { setBonusMode("50"); setBase(null); }}
               />
               <span className="text-sm font-semibold text-yellow-400">BONUS 50%</span>
-            </label> */}
+            </label>
           </div>
           <div className="mt-2 text-[10px] text-blue-400">
             {bonusMode === "20" ? "Đang dùng: Bonus 20% — công thức gốc" : "Đang dùng: Bonus 50% — công thức SL Máy 1 đã điều chỉnh"}
@@ -826,7 +977,7 @@ const Page = () => {
                       value={m3 === "buy" && disp.m3_sl != null ? disp.m3_sl : base.m3b.sl}
                       type="sl"
                     />
-                    <ActualEntryZone visible={m3 === "buy"} value={actM3} onChange={setActM3} />
+                    <ActualEntryZone visible={m3 === "buy"} value={actM3} onChange={onActM3Change} />
                   </Card>
                 )}
 
@@ -854,7 +1005,7 @@ const Page = () => {
                       value={m3 === "sell" && disp.m3_sl != null ? disp.m3_sl : base.m3s.sl}
                       type="sl"
                     />
-                    <ActualEntryZone visible={m3 === "sell"} value={actM3} onChange={setActM3} />
+                    <ActualEntryZone visible={m3 === "sell"} value={actM3} onChange={onActM3Change} />
                   </Card>
                 )}
               </div>
@@ -882,7 +1033,7 @@ const Page = () => {
                     </div>
                     <DataRow label="SETUP" value={disp.m4b.setup} type="setup" />
                     <DataRow label="SL" value={disp.m4b.sl} type="sl" />
-                    <ActualEntryZone visible={m4b} value={actM4b} onChange={setActM4b} />
+                    <ActualEntryZone visible={m4b} value={actM4b} onChange={onActM4bChange} />
                   </Card>
                 )}
 
@@ -901,7 +1052,7 @@ const Page = () => {
                     </div>
                     <DataRow label="SETUP" value={disp.m4s.setup} type="setup" />
                     <DataRow label="SL" value={disp.m4s.sl} type="sl" />
-                    <ActualEntryZone visible={m4s} value={actM4s} onChange={setActM4s} />
+                    <ActualEntryZone visible={m4s} value={actM4s} onChange={onActM4sChange} />
                   </Card>
                 )}
               </div>

@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, orderBy, doc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, doc, updateDoc, deleteDoc, onSnapshot, setDoc, where } from 'firebase/firestore';
 
 const COLLECTION = 'transactions';
 
@@ -37,4 +37,31 @@ export function fbOnTransactionsSnapshot(cb: (items: any[]) => void) {
     cb(items);
   });
   return unsub;
+}
+
+const TRADE_COLLECTION = 'trade_profiles';
+
+export async function fbUpsertTradeProfile(userId: string, profile: { id: string; name: string; state: any }) {
+  const db = getDb();
+  const docId = `${userId}__${profile.id}`;
+  await setDoc(doc(db, TRADE_COLLECTION, docId), {
+    userId,
+    id: profile.id,
+    name: profile.name,
+    state: profile.state,
+    updatedAt: Date.now(),
+  }, { merge: true });
+}
+
+export async function fbGetTradeProfiles(userId: string) {
+  const db = getDb();
+  const q = query(collection(db, TRADE_COLLECTION), where('userId', '==', userId));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id.split('__')[1], ...(d.data() as any) }));
+}
+
+export async function fbDeleteTradeProfile(userId: string, id: string) {
+  const db = getDb();
+  const docId = `${userId}__${id}`;
+  await deleteDoc(doc(db, TRADE_COLLECTION, docId));
 }

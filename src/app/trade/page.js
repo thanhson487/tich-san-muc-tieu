@@ -992,6 +992,14 @@ const Page = () => {
     }
   };
 
+  useEffect(() => {
+    if (!isAuthed || !userId) return;
+    const timer = setInterval(() => {
+      syncAll();
+    }, 600000);
+    return () => clearInterval(timer);
+  }, [isAuthed, userId]);
+
   let disp = null;
   if (base) {
     if (m3) {

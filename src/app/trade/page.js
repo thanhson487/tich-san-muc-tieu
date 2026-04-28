@@ -1340,6 +1340,19 @@ const Page = () => {
           </div>
         )}
       </div>
+      <Modal
+  title="Sửa tên profile"
+  open={renameOpen}
+  onOk={confirmRenameProfile}
+  onCancel={() => { setRenameOpen(false); setRenameTargetId(null); }}
+  centered
+>
+  <Input 
+    value={renameValue} 
+    onChange={(e) => setRenameValue(e.target.value)} 
+    placeholder="Nhập tên mới"
+  />
+</Modal>
     </div>
   );
 };

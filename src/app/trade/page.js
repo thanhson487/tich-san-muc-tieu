@@ -182,7 +182,7 @@ function computeFinal3M(base, m3Match, actM3) {
   if (m3Match === "buy") {
     m3_setup = actM3 > 0 ? actM3 : base.m3b.setup;
     m3_sl = m3_setup - range3;
-    m3_tp = base.m2sl + 0.9;
+    m3_tp = base.m2sl - 0.9;
     return {
       m3_setup,
       m3_sl,
@@ -192,7 +192,7 @@ function computeFinal3M(base, m3Match, actM3) {
   } else {
     m3_setup = actM3 > 0 ? actM3 : base.m3s.setup;
     m3_sl = m3_setup + range3;
-    m3_tp = base.m1sl - 0.9;
+    m3_tp = base.m1sl + 0.9;
     return {
       m3_setup,
       m3_sl,

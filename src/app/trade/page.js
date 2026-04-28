@@ -183,26 +183,20 @@ function computeFinal3M(base, m3Match, actM3) {
     m3_setup = actM3 > 0 ? actM3 : base.m3b.setup;
     m3_sl = m3_setup - range3;
     m3_tp = base.m2sl + 0.9;
-    const m2tp = m3_sl + 0.9;
     return {
       m3_setup,
       m3_sl,
       m3_tp,
-      m1tp: null,
-      m2tp: m2tp,
       adjusted: actM3 > 0,
     };
   } else {
     m3_setup = actM3 > 0 ? actM3 : base.m3s.setup;
     m3_sl = m3_setup + range3;
     m3_tp = base.m1sl - 0.9;
-    const m1tp = m3_sl - 0.9;
     return {
       m3_setup,
       m3_sl,
       m3_tp,
-      m1tp: m1tp,
-      m2tp: null,
       adjusted: actM3 > 0,
     };
   }
@@ -337,7 +331,7 @@ const Machine3Notification3M = ({ m3, base, disp, actM3 }) => {
           <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m3_sl)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
           <div className="pl-2">- TP: <span className="text-green-400">{fmt(disp.m3_tp)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
           <div className="mt-1 font-semibold text-red-300">📊 MÁY 2 (SELL):</div>
-          <div className="pl-2">- TP: <span className="text-green-400">{fmt(disp.m2tp)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- TP: <span className="text-green-400">{fmt(base.m3b.sl + 0.9)}</span></div>
           <div className="mt-1 text-yellow-500 text-[10px] italic">
             ℹ️ MÁY 1 (BUY) đã bị ẩn do đã chuyển lệnh sang MÁY 3
           </div>
@@ -361,7 +355,7 @@ const Machine3Notification3M = ({ m3, base, disp, actM3 }) => {
           <div className="pl-2">- SL: <span className="text-red-400">{fmt(disp.m3_sl)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
           <div className="pl-2">- TP: <span className="text-green-400">{fmt(disp.m3_tp)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
           <div className="mt-1 font-semibold text-green-300">📊 MÁY 1 (BUY):</div>
-          <div className="pl-2">- TP: <span className="text-green-400">{fmt(disp.m1tp)}</span> {hasActualEntry && <span className="text-green-500 text-[10px]">(đã điều chỉnh)</span>}</div>
+          <div className="pl-2">- TP: <span className="text-green-400">{fmt(base.m3s.sl - 0.9)}</span></div>
           <div className="mt-1 text-yellow-500 text-[10px] italic">
             ℹ️ MÁY 2 (SELL) đã bị ẩn do đã chuyển lệnh sang MÁY 3
           </div>
@@ -988,8 +982,6 @@ const Page = () => {
           m3_setup: null,
           m3_sl: null,
           m3_tp: null,
-          m1tp: null,
-          m2tp: null,
           adjusted: false,
         };
       }
@@ -1005,81 +997,50 @@ const Page = () => {
   return (
     <div>
       <div className="max-w-4xl mx-auto px-4">
-        <div className="mb-4">
-          <Card size="small">
-            <div className="flex justify-center gap-8">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Radio
-                  checked={mode === "3M"}
-                  onChange={() => {
-                    setMode("3M");
-                  }}
-                />
-                <span className="font-semibold">3 MÁY (Không máy 4)</span>
-              </label>
-               <label className="flex items-center gap-2 cursor-pointer">
-                <Radio
-                  checked={mode === "4M"}
-                  onChange={() => {
-                    setMode("4M");
-                  }}
-                />
-                <span className="font-semibold">4 MÁY (Có máy 4)</span>
-              </label>
-            </div>
-          
-          </Card>
-        </div>
+        <div className="sticky top-0 z-50 pt-2" style={{ backgroundColor: isDark ? '#141414' : '#ffffff' }}>
+        
 
-        <div className="mb-3">
-          <Tabs
-            activeKey={activeProfileId}
-            onChange={(key) => {
-              setActiveProfileId(key);
-              if (typeof window !== "undefined") {
-                try {
-                  localStorage.setItem(ACTIVE_PROFILE_KEY, key);
-                } catch { }
-              }
-            }}
-            items={profiles.map((p) => ({
-              key: p.id,
-              label: (
-                <div className="flex items-center gap-2">
-                  <span style={{ color: isDark ? "#e5e7eb" : "#111827" }}>{p.name}</span>
-                  <Button size="small" type="link" onClick={(e) => { e.stopPropagation(); openRenameProfile(p.id); }}>Sửa</Button>
-                  <Button size="small" danger type="link" onClick={(e) => { e.stopPropagation(); removeProfile(p.id); }}>Xoá</Button>
-                </div>
-              ),
-            }))}
-          />
-          <Modal
-            title="Sửa tên profile"
-            open={renameOpen}
-            onOk={confirmRenameProfile}
-            onCancel={() => { setRenameOpen(false); setRenameTargetId(null); }}
-            centered
-          >
-            <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} />
-          </Modal>
-          <div className="flex justify-end">
-            <div className="flex items-center gap-2">
-              <Button size="small" onClick={addProfile}>Thêm Profile</Button>
-              <Button
-                size="small"
-                type="primary"
-                onClick={syncAll}
-                style={{ display: mounted && isAuthed ? 'inline-block' : 'none' }}
-              >
-                Đồng bộ
-              </Button>
-              <Button
-                size="small"
-                onClick={refreshFromCloud}
-                style={{ display: mounted && isAuthed ? 'inline-block' : 'none' }}
-              >
-                Làm mới
-              </Button>
+          <div className="mb-3">
+            <Tabs
+              activeKey={activeProfileId}
+              onChange={(key) => {
+                setActiveProfileId(key);
+                if (typeof window !== "undefined") {
+                  try {
+                    localStorage.setItem(ACTIVE_PROFILE_KEY, key);
+                  } catch { }
+                }
+              }}
+              items={profiles.map((p) => ({
+                key: p.id,
+                label: (
+                  <div className="flex items-center gap-2">
+                    <span style={{ color: isDark ? "#e5e7eb" : "#111827" }}>{p.name}</span>
+                    <Button size="small" type="link" onClick={(e) => { e.stopPropagation(); openRenameProfile(p.id); }}>Sửa</Button>
+                    <Button size="small" danger type="link" onClick={(e) => { e.stopPropagation(); removeProfile(p.id); }}>Xoá</Button>
+                  </div>
+                ),
+              }))}
+            />
+            <div className="flex justify-end mt-2 pb-2">
+              <div className="flex items-center gap-2">
+                <Button size="small" onClick={addProfile}>Thêm Profile</Button>
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={syncAll}
+                  style={{ display: mounted && isAuthed ? 'inline-block' : 'none' }}
+                >
+                  Đồng bộ
+                </Button>
+                <Button
+                  size="small"
+                  onClick={refreshFromCloud}
+                  style={{ display: mounted && isAuthed ? 'inline-block' : 'none' }}
+                >
+                  Làm mới
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -1088,7 +1049,7 @@ const Page = () => {
           <div className="text-blue-200 tracking-widest text-xs">◈ ◈ ◈</div>
         
         </div>
-
+{/* 
         <Card className="mb-3">
           <div className="text-xs tracking-widest text-blue-500 mb-3">▸ CHƯƠNG TRÌNH BONUS</div>
           <div className="flex gap-6">
@@ -1103,7 +1064,33 @@ const Page = () => {
           <div className="mt-2 text-[10px] text-blue-400">
             {bonusMode === "20" ? "Đang dùng: Bonus 20% — công thức gốc" : "Đang dùng: Bonus 50% — công thức SL Máy 1 đã điều chỉnh"}
           </div>
-        </Card>
+        </Card> */}
+          <div className="mb-4">
+            <Card size="small">
+              <div className="flex justify-center gap-8">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                  <Radio
+                    checked={mode === "3M"}
+                    onChange={() => {
+                      setMode("3M");
+                    }}
+                  />
+                  <span className="font-semibold">3 MÁY (Không máy 4)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Radio
+                    checked={mode === "4M"}
+                    onChange={() => {
+                      setMode("4M");
+                    }}
+                  />
+                  <span className="font-semibold">4 MÁY (Có máy 4)</span>
+                </label>
+              
+              </div>
+            
+            </Card>
+          </div>
 
         <Card>
           <div className="flex justify-between items-center mb-2">
@@ -1168,8 +1155,14 @@ const Page = () => {
                   <Tag color="green">BUY</Tag>
                 </div>
                 <DataRow label="SL" value={base.m1sl} type="sl" />
-                {mode === "3M" && m3 === "sell" && disp.m1tp !== null && (
-                  <DataRow label="TP" value={disp.m1tp} type="tp" adjBadge={disp.adjusted} />
+                {/* Chế độ 3 máy: TP = SL Sell Limit máy 3 - 0.9 */}
+                {mode === "3M" && (
+                  <DataRow 
+                    label="TP" 
+                    value={base.m3s.sl - 0.9} 
+                    type="tp" 
+                    adjBadge={actM3 && pf(actM3) > 0 && m3 === "sell"} 
+                  />
                 )}
                 {mode === "4M" && disp.m1tp !== null && (
                   <DataRow label="TP" value={disp.m1tp} type="tp" adjBadge={disp.adjusted} />
@@ -1185,8 +1178,14 @@ const Page = () => {
                   <Tag color="red">SELL</Tag>
                 </div>
                 <DataRow label="SL" value={base.m2sl} type="sl" />
-                {mode === "3M" && m3 === "buy" && disp.m2tp !== null && (
-                  <DataRow label="TP" value={disp.m2tp} type="tp" adjBadge={disp.adjusted} />
+                {/* Chế độ 3 máy: TP = SL Buy Limit máy 3 + 0.9 */}
+                {mode === "3M" && (
+                  <DataRow 
+                    label="TP" 
+                    value={base.m3b.sl + 0.9} 
+                    type="tp" 
+                    adjBadge={actM3 && pf(actM3) > 0 && m3 === "buy"} 
+                  />
                 )}
                 {mode === "4M" && disp.m2tp !== null && (
                   <DataRow label="TP" value={disp.m2tp} type="tp" adjBadge={disp.adjusted} />

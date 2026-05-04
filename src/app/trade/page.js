@@ -1049,7 +1049,7 @@ const Page = () => {
           <div className="text-blue-200 tracking-widest text-xs">◈ ◈ ◈</div>
         
         </div>
-{/* 
+
         <Card className="mb-3">
           <div className="text-xs tracking-widest text-blue-500 mb-3">▸ CHƯƠNG TRÌNH BONUS</div>
           <div className="flex gap-6">
@@ -1064,7 +1064,7 @@ const Page = () => {
           <div className="mt-2 text-[10px] text-blue-400">
             {bonusMode === "20" ? "Đang dùng: Bonus 20% — công thức gốc" : "Đang dùng: Bonus 50% — công thức SL Máy 1 đã điều chỉnh"}
           </div>
-        </Card> */}
+        </Card>
           <div className="mb-4">
             <Card size="small">
               <div className="flex justify-center gap-8">

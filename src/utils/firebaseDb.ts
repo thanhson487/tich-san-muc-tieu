@@ -1,5 +1,18 @@
 import { getDb } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, orderBy, doc, updateDoc, deleteDoc, onSnapshot, setDoc, where } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  getDoc,
+  getDocs,
+  query,
+  orderBy,
+  doc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  setDoc,
+  where,
+} from 'firebase/firestore';
 
 const COLLECTION = 'transactions';
 
@@ -64,4 +77,29 @@ export async function fbDeleteTradeProfile(userId: string, id: string) {
   const db = getDb();
   const docId = `${userId}__${id}`;
   await deleteDoc(doc(db, TRADE_COLLECTION, docId));
+}
+
+const AVERAGE_PRICE_COLLECTION = 'average_price_states';
+
+export async function fbUpsertAveragePriceState(
+  userId: string,
+  state: { rows: any[]; updatedAt: number }
+) {
+  const db = getDb();
+  await setDoc(
+    doc(db, AVERAGE_PRICE_COLLECTION, userId),
+    {
+      userId,
+      rows: state.rows,
+      updatedAt: state.updatedAt,
+    },
+    { merge: true }
+  );
+}
+
+export async function fbGetAveragePriceState(userId: string) {
+  const db = getDb();
+  const snap = await getDoc(doc(db, AVERAGE_PRICE_COLLECTION, userId));
+  if (!snap.exists()) return null;
+  return snap.data();
 }

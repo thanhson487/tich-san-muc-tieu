@@ -12,20 +12,14 @@ export default function Home() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (pathname !== '/trade') {
+    if (pathname === '/') {
       router.replace('/trade');
     }
+   
   }, [pathname, router]);
   return (
     <main>
-      {/* <Tabs
-        className="tabs-equal"
-        defaultActiveKey="calendar"
-        items={[
-          { key: 'calendar', label: 'Lịch', children: <CalendarView /> },
-          { key: 'history', label: 'Chi tiết', children: <HistoryTable /> },
-        ]}
-      /> */}
+   
     </main>
   );
 }

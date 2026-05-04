@@ -83,13 +83,20 @@ const AVERAGE_PRICE_COLLECTION = 'average_price_states';
 
 export async function fbUpsertAveragePriceState(
   userId: string,
-  state: { rows: any[]; updatedAt: number }
+  state: {
+    basePrice?: number | null
+    tradeType?: string
+    rows: any[]
+    updatedAt: number | null
+  }
 ) {
   const db = getDb();
   await setDoc(
     doc(db, AVERAGE_PRICE_COLLECTION, userId),
     {
       userId,
+      basePrice: state.basePrice ?? null,
+      tradeType: state.tradeType ?? 'BUY',
       rows: state.rows,
       updatedAt: state.updatedAt,
     },

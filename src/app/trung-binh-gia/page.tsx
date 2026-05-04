@@ -1,12 +1,17 @@
 'use client'
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react'
-import { Button, Card, Divider, InputNumber, Table, Typography, message } from 'antd'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  Button,
+  Card,
+  Divider,
+  InputNumber,
+  Radio,
+  Table,
+  Tag,
+  Typography,
+  message,
+} from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   fbGetAveragePriceState,
@@ -16,58 +21,54 @@ import { useAuthStore } from '@/store/useAuthStore'
 
 const { Text, Title } = Typography
 
-function FinancialTool() {
+export default function FinancialTool() {
   const { isAuthed, userId } = useAuthStore()
-  const [dataSource, setDataSource] = useState<PriceRow[]>(() => getDefaultRows())
+  const [basePrice, setBasePrice] = useState<number | null>(2400)
+  const [tradeType, setTradeType] = useState<TradeType>('BUY')
   const [isHydrated, setIsHydrated] = useState(false)
-  const [isFetchingCloud, setIsFetchingCloud] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
-  const [hasLoadedCloud, setHasLoadedCloud] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null)
 
-  const totalValue = useMemo(
-    () =>
-      dataSource.reduce((total, item) => {
-        return total + getCalculatedValue(item)
-      }, 0),
-    [dataSource]
-  )
+  const dataSource = useMemo(() => {
+    if (basePrice === null) return []
+    return buildRows({ basePrice, tradeType })
+  }, [basePrice, tradeType])
 
-  const averageValue = useMemo(() => {
-    const validRows = dataSource.filter((item) => {
-      return typeof item.inputVal === 'number' && item.inputVal > 0
-    })
-
-    if (validRows.length === 0) return 0
-
-    const totalInput = validRows.reduce((total, item) => {
-      return total + (item.inputVal || 0)
-    }, 0)
-
-    return totalInput / validRows.length
+  const totalLot = useMemo(() => {
+    return dataSource.reduce((sum, item) => sum + item.weight, 0)
   }, [dataSource])
 
-  const handleValueChange = useCallback(
-    (key: number, field: 'inputVal' | 'weight', value: number | null) => {
-      setDataSource((currentRows) => {
-        return currentRows.map((item) => {
-          if (item.key !== key) return item
+  const totalValue = useMemo(() => {
+    return dataSource.reduce((sum, item) => {
+      return sum + (item.inputVal || 0) * item.weight
+    }, 0)
+  }, [dataSource])
 
-          if (field === 'inputVal') {
-            return {
-              ...item,
-              inputVal: value,
-            }
-          }
+  const averageValue = useMemo(() => {
+    if (totalLot <= 0) return 0
+    return totalValue / totalLot
+  }, [totalLot, totalValue])
 
-          return {
-            ...item,
-            weight: value ?? 0,
-          }
-        })
-      })
+  const hydrateState = useCallback((state: AveragePriceCloudState | null) => {
+    if (!state) return
+    setBasePrice(typeof state.basePrice === 'number' ? state.basePrice : 2400)
+    setTradeType(state.tradeType === 'SELL' ? 'SELL' : 'BUY')
+    setLastSyncedAt(getSafeTimestamp(state.updatedAt))
+  }, [])
+
+  const persistLocalState = useCallback(
+    (updatedAt: number | null = lastSyncedAt) => {
+      if (typeof window === 'undefined') return
+      const payload: AveragePriceCloudState = {
+        basePrice,
+        tradeType,
+        rows: dataSource,
+        updatedAt,
+      }
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload))
     },
-    []
+    [basePrice, dataSource, lastSyncedAt, tradeType]
   )
 
   const handleSync = useCallback(async () => {
@@ -81,74 +82,92 @@ function FinancialTool() {
     try {
       const updatedAt = Date.now()
       await fbUpsertAveragePriceState(userId, {
+        basePrice,
+        tradeType,
         rows: dataSource,
         updatedAt,
       })
       setLastSyncedAt(updatedAt)
-      message.success('Đồng bộ thành công')
+      persistLocalState(updatedAt)
+      message.success('Đồng bộ cloud thành công')
     } catch {
-      message.error('Đồng bộ thất bại')
+      message.error('Đồng bộ cloud thất bại')
     } finally {
       setIsSyncing(false)
     }
-  }, [dataSource, isAuthed, userId])
+  }, [basePrice, dataSource, isAuthed, persistLocalState, tradeType, userId])
+
+  const handleRefresh = useCallback(async () => {
+    if (!isAuthed || !userId) {
+      message.error('Bạn cần đăng nhập để lấy dữ liệu cloud')
+      return
+    }
+
+    setIsRefreshing(true)
+
+    try {
+      const cloudState = await fbGetAveragePriceState(userId)
+      if (!cloudState) {
+        message.info('Cloud chưa có dữ liệu')
+        return
+      }
+
+      hydrateState(cloudState)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudState))
+      }
+      message.success('Đã lấy dữ liệu từ cloud')
+    } catch {
+      message.error('Không lấy được dữ liệu cloud')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [hydrateState, isAuthed, userId])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     try {
       const rawState = localStorage.getItem(LOCAL_STORAGE_KEY)
-
       if (!rawState) {
         setIsHydrated(true)
         return
       }
 
       const parsedState = JSON.parse(rawState)
-      setDataSource(normalizeRows(parsedState?.rows))
-      setLastSyncedAt(getSafeTimestamp(parsedState?.updatedAt))
+      hydrateState(parsedState)
     } catch {
-      setDataSource(getDefaultRows())
+      setBasePrice(2400)
+      setTradeType('BUY')
     } finally {
       setIsHydrated(true)
     }
-  }, [])
+  }, [hydrateState])
 
   useEffect(() => {
-    if (!isHydrated || typeof window === 'undefined') return
-
-    const payload: StoredAveragePriceState = {
-      rows: dataSource,
-      updatedAt: lastSyncedAt,
-    }
-
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload))
-  }, [dataSource, isHydrated, lastSyncedAt])
+    if (!isHydrated) return
+    persistLocalState()
+  }, [isHydrated, persistLocalState])
 
   useEffect(() => {
-    if (!isHydrated || !isAuthed || !userId || hasLoadedCloud) return
+    if (!isHydrated || !isAuthed || !userId) return
 
     let isCancelled = false
 
     async function loadCloudState() {
-      setIsFetchingCloud(true)
+      setIsRefreshing(true)
 
       try {
         const cloudState = await fbGetAveragePriceState(userId)
         if (isCancelled || !cloudState) return
-
-        const normalizedRows = normalizeRows(cloudState.rows)
-        const updatedAt = getSafeTimestamp(cloudState.updatedAt)
-
-        setDataSource(normalizedRows)
-        setLastSyncedAt(updatedAt)
-      } catch {
-        if (!isCancelled) message.error('Không tải được dữ liệu đồng bộ')
-      } finally {
-        if (!isCancelled) {
-          setIsFetchingCloud(false)
-          setHasLoadedCloud(true)
+        hydrateState(cloudState)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cloudState))
         }
+      } catch {
+        if (!isCancelled) message.error('Không tải được dữ liệu cloud')
+      } finally {
+        if (!isCancelled) setIsRefreshing(false)
       }
     }
 
@@ -157,177 +176,167 @@ function FinancialTool() {
     return () => {
       isCancelled = true
     }
-  }, [hasLoadedCloud, isAuthed, isHydrated, userId])
-
-  useEffect(() => {
-    if (isAuthed && userId) return
-    setHasLoadedCloud(false)
-  }, [isAuthed, userId])
+  }, [hydrateState, isAuthed, isHydrated, userId])
 
   const columns: ColumnsType<PriceRow> = [
     {
-      title: 'Khoảng giá',
+      title: 'Vị trí lệnh',
       dataIndex: 'range',
       key: 'range',
-      align: 'center',
-      width: 140,
-    },
-    {
-      title: 'Giá trị nhập (VNĐ)',
-      dataIndex: 'inputVal',
-      key: 'inputVal',
-      align: 'center',
-      render: (_, record) => {
+      render: (value, record) => {
         return (
-          <InputNumber
-            aria-label={`Giá trị nhập ${record.range}`}
-            className='w-full'
-            controls={false}
-            inputMode='decimal'
-            min={0}
-            parser={parseNumericString}
-            placeholder='Nhập giá trị'
-            value={record.inputVal}
-        
-            onChange={(value) => {
-              handleValueChange(record.key, 'inputVal', value)
-            }}
-          />
+          <div className='space-y-1'>
+            <Text strong>{value}</Text>
+            <div>
+              <Tag color='blue'>Cách gốc: {record.offset} giá</Tag>
+            </div>
+          </div>
         )
       },
     },
     {
-      title: 'Tỷ trọng',
+      title: 'Mức giá Entry',
+      dataIndex: 'inputVal',
+      key: 'inputVal',
+      align: 'right',
+      render: (value) => {
+        return (
+          <Text strong className='text-blue-600'>
+            {formatPrice(value)}
+          </Text>
+        )
+      },
+    },
+    {
+      title: 'Khối lượng',
       dataIndex: 'weight',
       key: 'weight',
       align: 'center',
-      width: 140,
-      render: (_, record) => {
-        return (
-          <InputNumber
-            aria-label={`Tỷ trọng ${record.range}`}
-            className='w-full'
-            controls={false}
-            inputMode='decimal'
-            min={0}
-            parser={parseNumericString}
-            step={0.1}
-            value={record.weight}
-            onChange={(value) => {
-              handleValueChange(record.key, 'weight', value)
-            }}
-          />
-        )
+      render: (value) => {
+        return <Tag color='orange'>{value} lot</Tag>
       },
     },
-    {
-      title: 'Giá trị tính toán',
-      key: 'calculated',
-      align: 'center',
-      render: (_, record) => {
-        return <Text strong>{formatCurrency(getCalculatedValue(record))}</Text>
-      },
-    },
+    
   ]
 
   return (
     <div className='min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-6'>
       <div className='mx-auto max-w-5xl space-y-4'>
-        <div className='space-y-1'>
-          <Title level={3} className='!mb-0'>
-            Trung bình giá
-          </Title>
-          <Text type='secondary'>
-            Nhập giá và tỷ trọng, dữ liệu sẽ được lưu tại máy và có thể
-            đồng bộ theo tài khoản.
-          </Text>
-        </div>
-
-        <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-          <Card className='rounded-xl'>
-            <Text type='secondary'>Tổng cộng</Text>
-            <div className='mt-2 text-2xl font-bold text-red-500'>
-              {totalValue} VNĐ
-            </div>
-          </Card>
-          <Card className='rounded-xl'>
-            <Text type='secondary'>Trung bình</Text>
-            <div className='mt-2 text-2xl font-bold text-sky-600'>
-              {averageValue} VNĐ
-            </div>
-          </Card>
-        </div>
-
-        <Card className='rounded-xl'>
-          <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-            <div className='space-y-1'>
-              <Text strong>Đồng bộ dữ liệu</Text>
-              <div className='text-sm text-gray-500'>
-                {getSyncMessage({
-                  isAuthed,
-                  isFetchingCloud,
-                  lastSyncedAt,
-                })}
-              </div>
-            </div>
-
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'>
+       
+          <div className='flex gap-2'>
+            <Button
+              className='flex-1 sm:flex-none'
+              loading={isRefreshing}
+              onClick={handleRefresh}
+            >
+              Làm mới
+            </Button>
             <Button
               type='primary'
-              className='w-full sm:w-auto'
+              className='flex-1 sm:flex-none'
               loading={isSyncing}
-              disabled={!isAuthed || !userId}
               onClick={handleSync}
             >
-              Đồng bộ
+              Đồng bộ cloud
             </Button>
+          </div>
+        </div>
+
+        <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+    
+          <SummaryCard
+            label='Giá trung bình'
+            value={`${formatPrice(averageValue)}`}
+            valueClassName='text-sky-600'
+          />
+          <SummaryCard
+            label='Tổng khối lượng'
+            value={`${formatPrice(totalLot)} lot`}
+            valueClassName='text-orange-500'
+          />
+        </div>
+
+        <Card className='rounded-xl border-none shadow-sm'>
+          <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
+            <div className='space-y-2'>
+              <Text strong className='mr-5'>Giá lệnh 1</Text>
+              <InputNumber
+                aria-label='Giá lệnh 1'
+                className='w-full'
+                controls={false}
+                inputMode='decimal'
+                min={0}
+                size='large'
+                placeholder='Nhập giá vàng hiện tại'
+                value={basePrice}
+                onChange={handleBasePriceChange}
+              />
+            </div>
+
+            <div className='space-y-2'>
+              <Text strong>Chiều giao dịch</Text>
+              <Radio.Group
+                aria-label='Chiều giao dịch'
+                className='grid w-full grid-cols-2'
+                optionType='button'
+              
+                size='large'
+                value={tradeType}
+                onChange={handleTradeTypeChange}
+              >
+                <Radio.Button value='BUY' className=' !mb-5 !text-center'>
+                  BUY
+                </Radio.Button>
+                <Radio.Button value='SELL' className=' mb-5 !text-center'>
+                  SELL
+                </Radio.Button>
+              </Radio.Group>
+            </div>
+          </div>
+
+          <Divider className='!my-4' />
+
+          <div className='text-sm text-gray-500'>
+            {getSyncStatusLabel({
+              isAuthed,
+              isRefreshing,
+              lastSyncedAt,
+            })}
           </div>
         </Card>
 
         <div className='space-y-3 md:hidden'>
           {dataSource.map((item) => {
+            const gap = Math.abs((item.inputVal || 0) - averageValue)
+
             return (
-              <Card key={item.key} className='rounded-xl'>
+              <Card key={item.key} className='rounded-xl border-none shadow-sm'>
                 <div className='space-y-3'>
-                  <div className='flex items-center justify-between'>
-                    <Text strong>{item.range}</Text>
-                    <Text type='secondary'>
-                      {formatCurrency(getCalculatedValue(item))} VNĐ
-                    </Text>
+                  <div className='flex items-start justify-between gap-3'>
+                    <div className='space-y-1'>
+                      <Text strong>{item.range}</Text>
+                      <div>
+                        <Tag color='blue'>Cách gốc: {item.offset} giá</Tag>
+                      </div>
+                    </div>
+                    <Tag color='orange'>{item.weight} lot</Tag>
                   </div>
 
-                  <div className='space-y-2'>
-                    <Text type='secondary'>Giá trị nhập</Text>
-                    <InputNumber
-                      aria-label={`Giá trị nhập ${item.range}`}
-                      className='w-full'
-                      controls={false}
-                      inputMode='decimal'
-                      min={0}
-                      parser={parseNumericString}
-                      placeholder='Nhập giá trị'
-                      value={item.inputVal}
-                      formatter={formatInputValue}
-                      onChange={(value) => {
-                        handleValueChange(item.key, 'inputVal', value)
-                      }}
-                    />
+                  <div className='rounded-lg  p-3'>
+                    <div className='flex items-center justify-between'>
+                      <Text type='secondary'>Entry</Text>
+                      <Text strong className='text-blue-600'>
+                        {formatPrice(item.inputVal)}
+                      </Text>
+                    </div>
                   </div>
 
-                  <div className='space-y-2'>
-                    <Text type='secondary'>Tỷ trọng</Text>
-                    <InputNumber
-                      aria-label={`Tỷ trọng ${item.range}`}
-                      className='w-full'
-                      controls={false}
-                      inputMode='decimal'
-                      min={0}
-                      parser={parseNumericString}
-                      step={0.1}
-                      value={item.weight}
-                      onChange={(value) => {
-                        handleValueChange(item.key, 'weight', value)
-                      }}
-                    />
+                  <div className='rounded-lg  p-3'>
+                    <div className='flex items-center justify-between'>
+                      <Text type='secondary'>Khoảng hồi</Text>
+                      <Text type='danger'>{formatPrice(gap)} giá</Text>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -335,66 +344,58 @@ function FinancialTool() {
           })}
         </div>
 
-        <Card className='hidden rounded-xl md:block'>
+        <Card className='hidden overflow-hidden rounded-xl border-none shadow-sm md:block'>
           <Table
             rowKey='key'
             dataSource={dataSource}
             columns={columns}
             pagination={false}
             bordered
+            size='middle'
           />
         </Card>
-
-        <Divider className='!my-2' />
-        <Text italic type='secondary'>
-          Chúc bạn quản lý tài chính hiệu quả!
-        </Text>
       </div>
     </div>
   )
+
+  function handleBasePriceChange(value: number | null) {
+    setBasePrice(value)
+  }
+
+  function handleTradeTypeChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const nextValue = event.target.value === 'SELL' ? 'SELL' : 'BUY'
+    setTradeType(nextValue)
+  }
 }
 
-function getDefaultRows(): PriceRow[] {
-  return DEFAULT_ROWS.map((item) => {
+function buildRows({
+  basePrice,
+  tradeType,
+}: BuildRowsOptions): PriceRow[] {
+  return DCA_STRATEGY_CONFIG.map((config) => {
+    const rawPrice =
+      tradeType === 'BUY'
+        ? basePrice - config.offset
+        : basePrice + config.offset
+
     return {
-      ...item,
-      inputVal: null,
+      key: config.key,
+      range: config.label,
+      inputVal: Number(rawPrice.toFixed(2)),
+      weight: config.lot,
+      offset: config.offset,
     }
   })
 }
 
-function normalizeRows(input: unknown): PriceRow[] {
-  if (!Array.isArray(input)) return getDefaultRows()
-
-  return DEFAULT_ROWS.map((defaultRow) => {
-    const matchedRow = input.find((item) => {
-      return typeof item === 'object' && item !== null &&
-        'key' in item && item.key === defaultRow.key
-    })
-
-    if (!matchedRow || typeof matchedRow !== 'object') {
-      return {
-        ...defaultRow,
-        inputVal: null,
-      }
-    }
-
-    const inputVal =
-      typeof matchedRow.inputVal === 'number' ? matchedRow.inputVal : null
-    const weight =
-      typeof matchedRow.weight === 'number' ? matchedRow.weight : defaultRow.weight
-
-    return {
-      key: defaultRow.key,
-      range: defaultRow.range,
-      inputVal,
-      weight,
-    }
+function formatPrice(value: number | null | undefined): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '0.00'
+  return value.toLocaleString('vi-VN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })
-}
-
-function getCalculatedValue(item: PriceRow): number {
-  return (item.inputVal || 0) * item.weight
 }
 
 function getSafeTimestamp(value: unknown): number | null {
@@ -402,68 +403,90 @@ function getSafeTimestamp(value: unknown): number | null {
   return value
 }
 
-function parseNumericString(value: string | undefined): string {
-  if (!value) return ''
-  return value.replace(/[^\d.]/g, '')
-}
-
-function formatInputValue(value: number | string | undefined): string {
-  if (value === undefined || value === null || value === '') return ''
-  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-}
-
-function formatCurrency(value: number): string {
-  return value
-}
-
-function getSyncMessage({
+function getSyncStatusLabel({
   isAuthed,
-  isFetchingCloud,
+  isRefreshing,
   lastSyncedAt,
-}: SyncMessageOptions): string {
-  if (!isAuthed) return 'Đăng nhập để đồng bộ dữ liệu giữa các thiết bị'
-  if (isFetchingCloud) return 'Đang tải dữ liệu đã đồng bộ...'
+}: SyncStatusLabelOptions): string {
+  if (!isAuthed) return 'Đăng nhập để đồng bộ dữ liệu lên cloud'
+  if (isRefreshing) return 'Đang lấy dữ liệu từ cloud...'
   if (!lastSyncedAt) return 'Chưa có lần đồng bộ nào'
-  return `Lần đồng bộ gần nhất: ${new Date(lastSyncedAt).toLocaleString(
-    'vi-VN'
-  )}`
+  return `Đồng bộ gần nhất: ${new Date(lastSyncedAt).toLocaleString('vi-VN')}`
 }
 
-export default FinancialTool
+function SummaryCard({
+  label,
+  value,
+  valueClassName,
+}: SummaryCardProps) {
+  return (
+    <Card className='rounded-xl border-none shadow-sm'>
+      <Text type='secondary'>{label}</Text>
+      <div className={`mt-2 text-2xl font-bold ${valueClassName}`}>
+        {value}
+      </div>
+    </Card>
+  )
+}
 
 const LOCAL_STORAGE_KEY = 'average-price-tool-state'
 
-const DEFAULT_ROWS: DefaultPriceRow[] = [
-  { key: 1, range: 'Giá 1', weight: 0.5 },
-  { key: 2, range: 'Giá 2', weight: 0.5 },
-  { key: 3, range: 'Giá 3', weight: 0.5 },
-  { key: 4, range: 'Giá 4', weight: 0.5 },
-  { key: 5, range: 'Giá 5', weight: 1 },
-  { key: 6, range: 'Giá 6', weight: 1 },
-  { key: 7, range: 'Giá 7', weight: 1.5 },
-  { key: 8, range: 'Giá 8', weight: 1.5 },
+const DCA_STRATEGY_CONFIG = [
+  { key: 1, label: 'Lệnh 1', lot: 0.22, offset: 0 },
+  
+  // Lệnh 2 (Khoảng cách 15 giá) -> Tách đôi
+  { key: 2, label: 'Lệnh 2.1', lot: 0.23, offset: 7.5 }, 
+  { key: 3, label: 'Lệnh 2.2', lot: 0.23, offset: 15 },
+  
+  // Lệnh 3 (Khoảng cách thêm 20 giá = tổng 35) -> Tách đôi
+  { key: 4, label: 'Lệnh 3.1', lot: 0.45, offset: 25 }, 
+  { key: 5, label: 'Lệnh 3.2', lot: 0.45, offset: 35 },
+  
+  // Lệnh 4 (Khoảng cách thêm 25 giá = tổng 60)
+  { key: 6, label: 'Lệnh 4', lot: 1.80, offset: 60 },
+  
+  // Lệnh 5 (Khoảng cách thêm 40 giá = tổng 100)
+  { key: 7, label: 'Lệnh 5', lot: 3.62, offset: 100 },
 ]
+
 
 interface PriceRow {
   key: number
   range: string
   inputVal: number | null
   weight: number
+  offset: number
 }
 
-interface DefaultPriceRow {
+interface DcaStrategyItem {
   key: number
-  range: string
-  weight: number
+  label: string
+  lot: number
+  offset: number
 }
 
-interface StoredAveragePriceState {
+interface AveragePriceCloudState {
+  basePrice: number | null
+  tradeType: TradeType
   rows: PriceRow[]
   updatedAt: number | null
 }
 
-interface SyncMessageOptions {
+interface BuildRowsOptions {
+  basePrice: number
+  tradeType: TradeType
+}
+
+interface SummaryCardProps {
+  label: string
+  value: string
+  valueClassName: string
+}
+
+interface SyncStatusLabelOptions {
   isAuthed: boolean
-  isFetchingCloud: boolean
+  isRefreshing: boolean
   lastSyncedAt: number | null
 }
+
+type TradeType = 'BUY' | 'SELL'

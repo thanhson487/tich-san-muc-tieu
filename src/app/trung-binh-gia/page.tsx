@@ -166,7 +166,7 @@ export default function FinancialTool() {
       key: 'inputVal',
       align: 'right',
       render: (value) => (
-        <Text strong className='text-blue-600'>{formatPrice(value)}</Text>
+        <Text strong className='text-blue-600'>{value}</Text>
       ),
     },
     {
@@ -306,7 +306,7 @@ function buildRows({ basePrice, tradeType, isNightMode }: any): PriceRow[] {
 
 function formatPrice(value: number | null | undefined): string {
   if (typeof value !== 'number' || Number.isNaN(value)) return '0.00'
-  return value.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return value.toFixed(2)
 }
 
 function getSafeTimestamp(value: unknown): number | null {

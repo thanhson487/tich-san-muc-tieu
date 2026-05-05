@@ -86,7 +86,14 @@ export async function fbUpsertAveragePriceState(
   state: {
     basePrice?: number | null
     tradeType?: string
+    isNightMode?: boolean
+    checkedKeys?: number[]
     rows: any[]
+    summary?: {
+      avgActive?: number
+      totalLotActive?: number
+      totalLotFull?: number
+    }
     updatedAt: number | null
   }
 ) {
@@ -97,7 +104,10 @@ export async function fbUpsertAveragePriceState(
       userId,
       basePrice: state.basePrice ?? null,
       tradeType: state.tradeType ?? 'BUY',
+      isNightMode: state.isNightMode ?? false,
+      checkedKeys: Array.isArray(state.checkedKeys) ? state.checkedKeys : [],
       rows: state.rows,
+      summary: state.summary ?? null,
       updatedAt: state.updatedAt,
     },
     { merge: true }

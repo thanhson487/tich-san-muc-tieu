@@ -12,6 +12,7 @@ import {
   Typography,
   message,
   Switch,
+  Checkbox,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -23,8 +24,6 @@ import { useAuthStore } from '@/store/useAuthStore'
 const { Text, Title } = Typography
 
 // --- CẤU HÌNH CHIẾN THUẬT ---
-
-// 1. Cấu hình BAN ĐÊM (Giữ nguyên cấu trúc 5 tầng gốc của bạn)
 const NIGHT_STRATEGY = [
   { key: 1, label: 'Lệnh 1', lot: 0.22, offset: 0 },
   { key: 2, label: 'Lệnh 2.1', lot: 0.23, offset: 7.5 },
@@ -35,8 +34,6 @@ const NIGHT_STRATEGY = [
   { key: 7, label: 'Lệnh 5', lot: 3.62, offset: 100 },
 ]
 
-// 2. Cấu hình BAN NGÀY (4 tầng chính, L2.1 tại 15, L2.2 tại 35)
-// Tổng lot ~ 7.0
 const DAY_STRATEGY = [
   { key: 1, label: 'Lệnh 1', lot: 0.46, offset: 0 },
   { key: 2, label: 'Lệnh 2.1', lot: 0.47, offset: 15 }, 
@@ -51,104 +48,164 @@ export default function FinancialTool() {
   const [tradeType, setTradeType] = useState<TradeType>('BUY')
   const [isNightMode, setIsNightMode] = useState<boolean>(false)
   
+  // State mới: Lưu ID các lệnh đã khớp
+  const [checkedKeys, setCheckedKeys] = useState<number[]>([1]) 
+  
   const [isHydrated, setIsHydrated] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null)
+  const [hasLoadedCloud, setHasLoadedCloud] = useState(false)
 
   const dataSource = useMemo(() => {
     if (basePrice === null) return []
     return buildRows({ basePrice, tradeType, isNightMode })
   }, [basePrice, tradeType, isNightMode])
 
-  const totalLot = useMemo(() => {
-    return dataSource.reduce((sum, item) => sum + item.weight, 0)
-  }, [dataSource])
+  // Logic tính toán cho các lệnh ĐÃ TÍCH (Lệnh đã khớp)
+  const activeStats = useMemo(() => {
+    const activeRows = dataSource.filter(item => checkedKeys.includes(item.key))
+    const totalLotActive = activeRows.reduce((sum, item) => sum + item.weight, 0)
+    const totalValueActive = activeRows.reduce((sum, item) => sum + (item.inputVal || 0) * item.weight, 0)
+    const avgActive = totalLotActive > 0 ? totalValueActive / totalLotActive : 0
+    return { avgActive, totalLotActive }
+  }, [dataSource, checkedKeys])
 
-  const totalValue = useMemo(() => {
-    return dataSource.reduce((sum, item) => {
-      return sum + (item.inputVal || 0) * item.weight
-    }, 0)
-  }, [dataSource])
+  const totalLotFull = useMemo(() => dataSource.reduce((sum, item) => sum + item.weight, 0), [dataSource])
+  const cloudPayload = useMemo<AveragePriceCloudState>(() => {
+    return {
+      basePrice,
+      tradeType,
+      isNightMode,
+      checkedKeys,
+      rows: dataSource,
+      summary: {
+        avgActive: activeStats.avgActive,
+        totalLotActive: activeStats.totalLotActive,
+        totalLotFull,
+      },
+      updatedAt: lastSyncedAt,
+    }
+  }, [
+    activeStats.avgActive,
+    activeStats.totalLotActive,
+    basePrice,
+    checkedKeys,
+    dataSource,
+    isNightMode,
+    lastSyncedAt,
+    totalLotFull,
+    tradeType,
+  ])
 
-  const averageValue = useMemo(() => {
-    if (totalLot <= 0) return 0
-    return totalValue / totalLot
-  }, [totalLot, totalValue])
+  // --- HANDLERS ---
+  const toggleCheck = (key: number) => {
+    setCheckedKeys(prev => 
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    )
+  }
 
-  const hydrateState = useCallback((state: any) => {
+  const hydrateState = useCallback((state: AveragePriceCloudState | null) => {
     if (!state) return
     setBasePrice(typeof state.basePrice === 'number' ? state.basePrice : 2400)
     setTradeType(state.tradeType === 'SELL' ? 'SELL' : 'BUY')
     setIsNightMode(state.isNightMode !== undefined ? state.isNightMode : false)
+    if (Array.isArray(state.checkedKeys)) setCheckedKeys(state.checkedKeys.filter((key) => typeof key === 'number'))
     setLastSyncedAt(getSafeTimestamp(state.updatedAt))
   }, [])
 
   const persistLocalState = useCallback(
     (updatedAt: number | null = lastSyncedAt) => {
       if (typeof window === 'undefined') return
-      const payload = { basePrice, tradeType, isNightMode, updatedAt }
+      const payload: AveragePriceCloudState = {
+        ...cloudPayload,
+        updatedAt,
+      }
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload))
     },
-    [basePrice, tradeType, isNightMode, lastSyncedAt]
+    [cloudPayload, lastSyncedAt]
   )
 
   const handleSync = useCallback(async () => {
-    if (!isAuthed || !userId) {
-      message.error('Bạn cần đăng nhập để đồng bộ')
-      return
-    }
+    if (!isAuthed || !userId) { message.error('Bạn cần đăng nhập'); return }
     setIsSyncing(true)
     try {
       const updatedAt = Date.now()
       await fbUpsertAveragePriceState(userId, {
-        basePrice, tradeType, isNightMode, updatedAt, rows: dataSource
-      } as any)
+        ...cloudPayload,
+        updatedAt,
+      })
       setLastSyncedAt(updatedAt)
       persistLocalState(updatedAt)
       message.success('Đồng bộ cloud thành công')
-    } catch {
-      message.error('Đồng bộ cloud thất bại')
-    } finally {
-      setIsSyncing(false)
-    }
-  }, [basePrice, isNightMode, isAuthed, persistLocalState, tradeType, userId, dataSource])
+    } catch { message.error('Thất bại') } 
+    finally { setIsSyncing(false) }
+  }, [cloudPayload, isAuthed, persistLocalState, userId])
 
   const handleRefresh = useCallback(async () => {
-    if (!isAuthed || !userId) {
-      message.error('Bạn cần đăng nhập để lấy dữ liệu cloud')
-      return
-    }
+    if (!isAuthed || !userId) { message.error('Bạn cần đăng nhập'); return }
     setIsRefreshing(true)
     try {
       const cloudState = await fbGetAveragePriceState(userId)
-      if (!cloudState) {
-        message.info('Cloud chưa có dữ liệu')
-        return
-      }
-      hydrateState(cloudState)
-      message.success('Đã lấy dữ liệu từ cloud')
-    } catch {
-      message.error('Không lấy được dữ liệu cloud')
-    } finally {
-      setIsRefreshing(false)
-    }
+      if (cloudState) hydrateState(cloudState)
+    } catch { message.error('Lỗi tải dữ liệu') } 
+    finally { setIsRefreshing(false) }
   }, [hydrateState, isAuthed, userId])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      const rawState = localStorage.getItem(LOCAL_STORAGE_KEY)
-      if (rawState) hydrateState(JSON.parse(rawState))
-    } catch { setBasePrice(2400) } 
-    finally { setIsHydrated(true) }
-  }, [hydrateState])
+    setIsHydrated(true)
+  }, [])
 
   useEffect(() => {
     if (isHydrated) persistLocalState()
   }, [isHydrated, persistLocalState])
 
+  useEffect(() => {
+    if (!isHydrated || !isAuthed || !userId || hasLoadedCloud) return
+
+    let isCancelled = false
+
+    async function loadCloudState() {
+      setIsRefreshing(true)
+      try {
+        const cloudState = await fbGetAveragePriceState(userId)
+        if (isCancelled) return
+        if (cloudState) hydrateState(cloudState)
+      } catch {
+        if (!isCancelled) message.error('Không tải được dữ liệu cloud')
+      } finally {
+        if (!isCancelled) {
+          setHasLoadedCloud(true)
+          setIsRefreshing(false)
+        }
+      }
+    }
+
+    loadCloudState()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [hasLoadedCloud, hydrateState, isAuthed, isHydrated, userId])
+
+  useEffect(() => {
+    if (isAuthed && userId) return
+    setHasLoadedCloud(false)
+  }, [isAuthed, userId])
+
   const columns: ColumnsType<PriceRow> = [
+    {
+      title: 'Khớp',
+      key: 'check',
+      width: 60,
+      align: 'center',
+      render: (_, record) => (
+        <Checkbox 
+          checked={checkedKeys.includes(record.key)} 
+          onChange={() => toggleCheck(record.key)} 
+        />
+      ),
+    },
     {
       title: 'Vị trí lệnh',
       dataIndex: 'range',
@@ -156,7 +213,7 @@ export default function FinancialTool() {
       render: (value, record) => (
         <div className='space-y-1'>
           <Text strong>{value}</Text>
-          <div><Tag color='blue'>Cách gốc: {record.offset} giá</Tag></div>
+          <div><Tag color='blue' size="small">-{record.offset} giá</Tag></div>
         </div>
       ),
     },
@@ -165,42 +222,47 @@ export default function FinancialTool() {
       dataIndex: 'inputVal',
       key: 'inputVal',
       align: 'right',
-      render: (value) => (
-        <Text strong className='text-blue-600'>{value}</Text>
-      ),
+      render: (value) => <Text strong className='text-blue-600'>{value}</Text>,
     },
     {
       title: 'Khối lượng',
       dataIndex: 'weight',
       key: 'weight',
       align: 'center',
-      render: (value) => <Tag color='orange'>{value.toFixed(2)} lot</Tag>,
+      render: (value) => <Tag color='orange'>{value.toFixed(2)}</Tag>,
     },
   ]
 
   return (
-    <div className='min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-6'>
+    <div className='min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-6 bg-gray-50'>
       <div className='mx-auto max-w-5xl space-y-4'>
-        <div className='flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'>  
-        </div>
-
-        <div className=' flex flex-col gap-3 md:flex-row justify-between items-center '>
-          <SummaryCard
-            label='Giá trung bình'
-            value={formatPrice(averageValue)}
-            valueClassName='text-sky-600'
-          />
-           <div className='flex gap-2'>
-            <Button loading={isRefreshing} onClick={handleRefresh}>Làm mới</Button>
-            <Button type='primary' loading={isSyncing} onClick={handleSync}>Đồng bộ cloud</Button>
-          </div>
         
+        {/* Hàng Card thông số */}
+        <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
+          <SummaryCard
+            label='Giá TB Hiện Tại (Đã khớp)'
+            value={formatPrice(activeStats.avgActive)}
+            valueClassName='text-green-600'
+            subValue={`Khối lượng: ${activeStats.totalLotActive.toFixed(2)} lot`}
+          />
+          <SummaryCard
+            label='Tổng Lot Kế Hoạch'
+            value={`${totalLotFull.toFixed(2)} lot`}
+            valueClassName='text-orange-500'
+          />
+          <Card size="small" className='rounded-xl shadow-sm flex items-center justify-center border-none'>
+             <div className='flex gap-2'>
+              <Button loading={isRefreshing} onClick={handleRefresh}>Tải lại</Button>
+              <Button type='primary' loading={isSyncing} onClick={handleSync}>Đồng bộ</Button>
+            </div>
+          </Card>
         </div>
 
+        {/* Bảng điều khiển */}
         <Card className='rounded-xl border-none shadow-sm'>
           <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-            <div className='space-y-2'>
-              <Text strong className='mr-2'>Giá lệnh </Text>
+            <div className='space-y-1'>
+              <Text type="secondary" className='text-xs'>GIÁ LỆNH 1</Text>
               <InputNumber
                 className='w-full'
                 controls={false}
@@ -209,9 +271,8 @@ export default function FinancialTool() {
                 onChange={setBasePrice}
               />
             </div>
-
-            <div className='space-y-2'>
-              <Text strong>Chiều giao dịch</Text>
+            <div className='space-y-1'>
+              <Text type="secondary" className='text-xs'>CHIỀU GIAO DỊCH</Text>
               <Radio.Group
                 className='grid w-full grid-cols-2'
                 optionType='button'
@@ -223,32 +284,21 @@ export default function FinancialTool() {
                 <Radio.Button value='SELL' className='!text-center'>SELL</Radio.Button>
               </Radio.Group>
             </div>
-
-            <div className='flex flex-col justify-center space-y-2'>
-              <Text strong>Cấu hình phiên</Text>
+            <div className='flex flex-col justify-end pb-1'>
               <div className='flex items-center gap-3'>
-                <Switch 
-                  checked={isNightMode} 
-                  onChange={setIsNightMode} 
-                  checkedChildren="Đêm" 
-                  unCheckedChildren="Ngày"
-                />
-               
+                <Switch checked={isNightMode} onChange={setIsNightMode} />
+                <Text strong>{isNightMode ? "CHẾ ĐỘ BAN ĐÊM" : "CHẾ ĐỘ BAN NGÀY"}</Text>
               </div>
             </div>
           </div>
-          <Divider className='!my-4' />
-          <div className='text-xs text-gray-400'>
+          <Divider className='!my-3' />
+          <div className='text-[10px] text-gray-400 uppercase tracking-tighter'>
             {getSyncStatusLabel({ isAuthed, isRefreshing, lastSyncedAt })}
           </div>
         </Card>
-<SummaryCard
-            label='Tổng khối lượng'
-            value={`${totalLot.toFixed(2)} lot`}
-            valueClassName='text-orange-500'
-          />
-        {/* Desktop View */}
-        <Card className='hidden rounded-xl border-none shadow-sm md:block'>
+
+        {/* Desktop Table */}
+        <Card className='hidden md:block rounded-xl border-none shadow-sm overflow-hidden'>
           <Table
             rowKey='key'
             dataSource={dataSource}
@@ -262,9 +312,18 @@ export default function FinancialTool() {
         {/* Mobile View */}
         <div className='space-y-3 md:hidden'>
           {dataSource.map((item) => (
-            <Card key={item.key} size="small" className='rounded-xl border-none shadow-sm'>
+            <Card 
+              key={item.key} 
+              size="small" 
+              className={`rounded-xl border-none shadow-sm ${checkedKeys.includes(item.key) ? 'bg-green-50' : ''}`}
+              onClick={() => toggleCheck(item.key)}
+            >
               <div className='flex justify-between items-center'>
-                <Text strong>{item.range} <Tag className='ml-1' color='blue'>{item.offset}g</Tag></Text>
+                <div className='flex items-center gap-2'>
+                  <Checkbox checked={checkedKeys.includes(item.key)} />
+                  <Text strong>{item.range}</Text>
+                  <Tag color='blue' size="small">-{item.offset}g</Tag>
+                </div>
                 <Tag color='orange'>{item.weight.toFixed(2)} lot</Tag>
               </div>
               <div className='flex justify-between mt-2'>
@@ -280,16 +339,17 @@ export default function FinancialTool() {
 }
 
 // --- COMPONENTS ---
-function SummaryCard({ label, value, valueClassName }: { label: string, value: string, valueClassName: string }) {
+function SummaryCard({ label, value, valueClassName, subValue }: { label: string, value: string, valueClassName: string, subValue?: string }) {
   return (
-    <Card className='rounded-xl border-none shadow-sm' bodyStyle={{ padding: '16px' }}>
-      <Text type='secondary' className='text-xs uppercase tracking-wider'>{label}</Text>
-      <div className={`mt-1 text-xl font-bold ${valueClassName}`}>{value}</div>
+    <Card className='rounded-xl border-none shadow-sm' bodyStyle={{ padding: '12px 16px' }}>
+      <Text type='secondary' className='text-[10px] uppercase font-bold tracking-wider'>{label}</Text>
+      <div className={`text-xl font-black ${valueClassName}`}>{value}</div>
+      {subValue && <div className='text-[11px] text-gray-400'>{subValue}</div>}
     </Card>
   )
 }
 
-// --- LOGIC HELPER ---
+// --- HELPERS ---
 function buildRows({ basePrice, tradeType, isNightMode }: any): PriceRow[] {
   const strategy = isNightMode ? NIGHT_STRATEGY : DAY_STRATEGY
   return strategy.map((config) => {
@@ -305,8 +365,8 @@ function buildRows({ basePrice, tradeType, isNightMode }: any): PriceRow[] {
 }
 
 function formatPrice(value: number | null | undefined): string {
-  if (typeof value !== 'number' || Number.isNaN(value)) return '0.00'
-  return value.toFixed(2)
+  if (!value || Number.isNaN(value)) return '0.00'
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function getSafeTimestamp(value: unknown): number | null {
@@ -314,9 +374,9 @@ function getSafeTimestamp(value: unknown): number | null {
 }
 
 function getSyncStatusLabel({ isAuthed, isRefreshing, lastSyncedAt }: any): string {
-  if (!isAuthed) return 'Đăng nhập để đồng bộ'
-  if (isRefreshing) return 'Đang tải...'
-  return lastSyncedAt ? `Đồng bộ: ${new Date(lastSyncedAt).toLocaleTimeString('vi-VN')}` : 'Chưa đồng bộ'
+  if (!isAuthed) return 'Offline Mode'
+  if (isRefreshing) return 'Đang cập nhật...'
+  return lastSyncedAt ? `Đồng bộ: ${new Date(lastSyncedAt).toLocaleTimeString()}` : 'Chưa đồng bộ'
 }
 
 const LOCAL_STORAGE_KEY = 'average-price-tool-state'
@@ -327,6 +387,20 @@ interface PriceRow {
   inputVal: number | null
   weight: number
   offset: number
+}
+
+interface AveragePriceCloudState {
+  basePrice: number | null
+  tradeType: TradeType
+  isNightMode: boolean
+  checkedKeys: number[]
+  rows: PriceRow[]
+  summary: {
+    avgActive: number
+    totalLotActive: number
+    totalLotFull: number
+  }
+  updatedAt: number | null
 }
 
 type TradeType = 'BUY' | 'SELL'

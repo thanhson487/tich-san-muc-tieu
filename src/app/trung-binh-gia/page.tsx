@@ -234,7 +234,7 @@ export default function FinancialTool() {
   ]
 
   return (
-    <div className='min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-6 bg-gray-50'>
+    <div className='min-h-screen px-3 py-4 sm:px-4 sm:py-6 lg:px-6 '>
       <div className='mx-auto max-w-5xl space-y-4'>
         
         {/* Hàng Card thông số */}

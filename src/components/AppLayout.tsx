@@ -26,7 +26,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (pathname !== '/trade') {
+    if (pathname !== '/trade' && pathname !== '/dca') {
       router.replace('/trade');
     }
   }, [pathname, router]);

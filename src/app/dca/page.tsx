@@ -30,7 +30,7 @@ export default function DcaCalculatorPage() {
         const D0 = Math.abs(entry - sl);
         const maxLossAllowed = (D0 / baseDistance) * baseLoss;
         const firstOrderLoss = D0 * lotSize * contractSize;
-        
+
         if (firstOrderLoss > maxLossAllowed) {
             return `Lệnh đầu tiên có rủi ro ($${firstOrderLoss.toFixed(2)}) vượt quá tổng rủi ro cho phép ($${maxLossAllowed.toFixed(2)}). Cần giảm khoảng cách SL hoặc tăng mức lỗ tham chiếu.`;
         }
@@ -48,13 +48,13 @@ export default function DcaCalculatorPage() {
 
         const results = [];
         // Mảng 10 lệnh phân bổ nhỏ dần và kết thúc tại 93% khoảng cách đến SL
-        const PERCENTAGES = [0, 0.38, 0.56, 0.68, 0.77, 0.84, 0.87, 0.90, 0.92, 0.93];
+        const PERCENTAGES = [0, 0.28, 0.46, 0.58, 0.77, 0.84, 0.87, 0.90, 0.92, 0.93];
 
         for (let i = 0; i < N; i++) {
             // Lấy % từ mảng, nếu N > 10 thì giữ nguyên lệnh cuối ở mức 99%
             const pct = i < PERCENTAGES.length ? PERCENTAGES[i] : 0.99;
             const distFromEntry = D0 * pct;
-            
+
             const orderPrice = orderType === 'BUY'
                 ? Number(entry) - distFromEntry
                 : Number(entry) + distFromEntry;
@@ -234,11 +234,11 @@ export default function DcaCalculatorPage() {
                                     {orders.map((order, index) => (
                                         <tr key={index} className={`border-b border-slate-800 transition-colors ${checkedOrders[index] ? 'bg-slate-800/80 opacity-50' : 'hover:bg-slate-800/50'}`}>
                                             <td className="py-3 text-center">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     className="w-4 h-4 cursor-pointer accent-blue-500 rounded bg-slate-900 border-slate-700"
                                                     checked={!!checkedOrders[index]}
-                                                    onChange={(e) => setCheckedOrders(prev => ({...prev, [index]: e.target.checked}))}
+                                                    onChange={(e) => setCheckedOrders(prev => ({ ...prev, [index]: e.target.checked }))}
                                                 />
                                             </td>
                                             <td className="py-3">

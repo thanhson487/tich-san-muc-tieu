@@ -11,6 +11,7 @@ export default function DcaCalculatorPage() {
     const [lotSize, setLotSize] = useState(0.01);
     const [baseDistance, setBaseDistance] = useState(10);
     const [baseLoss, setBaseLoss] = useState(60);
+    const [checkedOrders, setCheckedOrders] = useState<Record<number, boolean>>({});
 
     const actualMaxLoss = useMemo(() => {
         if (entry === '' || sl === '' || baseDistance <= 0) return 0;
@@ -222,6 +223,7 @@ export default function DcaCalculatorPage() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-slate-700 text-slate-400 text-sm">
+                                        <th className="py-3 font-medium w-12 text-center">Đã vào</th>
                                         <th className="py-3 font-medium">Lệnh</th>
                                         <th className="py-3 font-medium">Volume</th>
                                         <th className="py-3 font-medium">Entry Giá</th>
@@ -230,9 +232,17 @@ export default function DcaCalculatorPage() {
                                 </thead>
                                 <tbody>
                                     {orders.map((order, index) => (
-                                        <tr key={index} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors">
+                                        <tr key={index} className={`border-b border-slate-800 transition-colors ${checkedOrders[index] ? 'bg-slate-800/80 opacity-50' : 'hover:bg-slate-800/50'}`}>
+                                            <td className="py-3 text-center">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="w-4 h-4 cursor-pointer accent-blue-500 rounded bg-slate-900 border-slate-700"
+                                                    checked={!!checkedOrders[index]}
+                                                    onChange={(e) => setCheckedOrders(prev => ({...prev, [index]: e.target.checked}))}
+                                                />
+                                            </td>
                                             <td className="py-3">
-                                                <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-xs">#{index + 1}</span>
+                                                <span className={`px-2 py-1 rounded text-xs ${checkedOrders[index] ? 'bg-slate-700 text-slate-500' : 'bg-slate-800 text-slate-300'}`}>#{index + 1}</span>
                                             </td>
                                             <td className="py-3 font-mono text-blue-400">{lotSize}</td>
                                             <td className="py-3 font-mono text-emerald-400 font-bold">{order.price.toFixed(2)}</td>

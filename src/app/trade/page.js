@@ -18,101 +18,59 @@ const decOnly = (s) =>
     .replace(/(\..*?)\..*/g, "$1");
 
 // Bonus 20%
-function computeBase(b1, b2, b3, b4, eb, es, lot) {
+function computeBase(b1, b2, b3, eb, es, lot) {
   const so = lot * 100 + 1;
   const range3 = (b3 - so) / lot / 100;
-  const range4 = (b4 - so) / lot / 100;
+  
   const m1sl = eb - (b1 - so) / lot / 100;
   const m2sl = es + (b2 - so) / lot / 100;
+  
   const m3b_setup = m1sl + 0.9;
   const m3b_sl = m3b_setup - range3;
+  const m3b_tp = m2sl - 0.9;
+  
   const m3s_setup = m2sl - 0.9;
   const m3s_sl = m3s_setup + range3;
-  const m4d_b_setup = m3b_sl + 0.9;
-  const m4d_b_sl = m4d_b_setup - range4;
-  const m4d_s_setup = m3s_sl - 0.9;
-  const m4d_s_sl = m4d_s_setup + range4;
+  const m3s_tp = m1sl + 0.9;
+  
+  const m1tp = m3s_sl - 0.9;
+  const m2tp = m3b_sl + 0.9;
+
   return {
     range3,
-    range4,
     m1sl,
     m2sl,
-    m3b: { setup: m3b_setup, sl: m3b_sl },
-    m3s: { setup: m3s_setup, sl: m3s_sl },
-    m4d_b: { setup: m4d_b_setup, sl: m4d_b_sl },
-    m4d_s: { setup: m4d_s_setup, sl: m4d_s_sl },
+    m1tp,
+    m2tp,
+    m3b: { setup: m3b_setup, sl: m3b_sl, tp: m3b_tp },
+    m3s: { setup: m3s_setup, sl: m3s_sl, tp: m3s_tp },
   };
 }
 
-// Bonus 50% — chỉ khác công thức m1sl
-function computeBase50(b1, b2, b3, b4, eb, es, lot) {
-  const so = lot * 100 + 1;
-  const range3 = (b3 - so) / lot / 100;
-  const range4 = (b4 - so) / lot / 100;
-  const m1sl = eb - (b1 - so + 1) / (lot - 0.01) / 100;
-  const m2sl = es + (b2 - so) / lot / 100;
-  const m3b_setup = m1sl + 0.9;
-  const m3b_sl = m3b_setup - range3;
-  const m3s_setup = m2sl - 0.9;
-  const m3s_sl = m3s_setup + range3;
-  const m4d_b_setup = m3b_sl + 0.9;
-  const m4d_b_sl = m4d_b_setup - range4;
-  const m4d_s_setup = m3s_sl - 0.9;
-  const m4d_s_sl = m4d_s_setup + range4;
-  return {
-    range3,
-    range4,
-    m1sl,
-    m2sl,
-    m3b: { setup: m3b_setup, sl: m3b_sl },
-    m3s: { setup: m3s_setup, sl: m3s_sl },
-    m4d_b: { setup: m4d_b_setup, sl: m4d_b_sl },
-    m4d_s: { setup: m4d_s_setup, sl: m4d_s_sl },
-  };
-}
-
-function computeFinal(base, m3Match, actM3, actM4b, actM4s) {
-  const { range3, range4 } = base;
+function computeFinal(base, m3Match, actM3) {
+  const { range3 } = base;
   let m3_setup;
   let m3_sl;
+  let m3_tp;
+
   if (m3Match === "buy") {
     m3_setup = actM3 > 0 ? actM3 : base.m3b.setup;
     m3_sl = m3_setup - range3;
+    m3_tp = base.m3b.tp;
   } else {
     m3_setup = actM3 > 0 ? actM3 : base.m3s.setup;
     m3_sl = m3_setup + range3;
+    m3_tp = base.m3s.tp;
   }
-  let m4b_setup;
-  let m4b_sl;
-  let m4s_setup;
-  let m4s_sl;
-  if (m3Match === "buy") {
-    m4b_setup = m3_sl + 0.9;
-    m4b_sl = m4b_setup - range4;
-    m4s_setup = base.m3s.setup;
-    m4s_sl = m4s_setup + range4;
-  } else {
-    m4b_setup = base.m3b.setup;
-    m4b_sl = m4b_setup - range4;
-    m4s_setup = m3_sl - 0.9;
-    m4s_sl = m4s_setup + range4;
-  }
-  if (actM4b > 0) {
-    m4b_setup = actM4b;
-    m4b_sl = actM4b - range4;
-  }
-  if (actM4s > 0) {
-    m4s_setup = actM4s;
-    m4s_sl = actM4s + range4;
-  }
-  const m1tp = m4s_sl - 0.9;
-  const m2tp = m4b_sl + 0.9;
-  const adjusted = actM3 > 0 || actM4b > 0 || actM4s > 0;
+  
+  let m1tp = (m3Match === "sell" ? m3_sl : base.m3s.sl) - 0.9;
+  let m2tp = (m3Match === "buy" ? m3_sl : base.m3b.sl) + 0.9;
+
+  const adjusted = actM3 > 0;
   return {
     m3_setup,
     m3_sl,
-    m4b: { setup: m4b_setup, sl: m4b_sl },
-    m4s: { setup: m4s_setup, sl: m4s_sl },
+    m3_tp,
     m1tp,
     m2tp,
     adjusted,
@@ -174,21 +132,15 @@ const Page = () => {
   const [b1, setB1] = useState("");
   const [b2, setB2] = useState("");
   const [b3, setB3] = useState("");
-  const [b4, setB4] = useState("");
   const [eb, setEb] = useState("");
   const [es, setEs] = useState("");
-  const [lot, setLot] = useState("0.05");
+  const [lot, setLot] = useState("0.07");
   const [base, setBase] = useState(null);
   const [m3, setM3] = useState(null);
-  const [m4b, setM4b] = useState(false);
-  const [m4s, setM4s] = useState(false);
   const [actM3, setActM3] = useState("");
-  const [actM4b, setActM4b] = useState("");
-  const [actM4s, setActM4s] = useState("");
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [renameTargetId, setRenameTargetId] = useState(null);
-  const [bonusMode, setBonusMode] = useState("20");
   const [stateHydrated, setStateHydrated] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -198,16 +150,11 @@ const Page = () => {
     setB1("");
     setB2("");
     setB3("");
-    setB4("");
     setEb("");
     setEs("");
     setBase(null);
     setM3(null);
-    setM4b(false);
-    setM4s(false);
     setActM3("");
-    setActM4b("");
-    setActM4s("");
     if (typeof window !== "undefined") {
       try {
         localStorage.removeItem(STORAGE_KEY);
@@ -268,18 +215,12 @@ const Page = () => {
                   setB1(data2.b1 ?? "");
                   setB2(data2.b2 ?? "");
                   setB3(data2.b3 ?? "");
-                  setB4(data2.b4 ?? "");
                   setEb(data2.eb ?? "");
                   setEs(data2.es ?? "");
-                  setLot(data2.lot ?? "0.05");
-                  setBonusMode(data2.bonusMode ?? "20");
+                  setLot(data2.lot ?? "0.07");
                   setBase(data2.base ?? null);
                   setM3(data2.m3 ?? null);
-                  setM4b(!!data2.m4b);
-                  setM4s(!!data2.m4s);
                   setActM3(data2.actM3 ?? "");
-                  setActM4b(data2.actM4b ?? "");
-                  setActM4s(data2.actM4s ?? "");
                 } catch {}
               }
             }
@@ -399,39 +340,27 @@ const Page = () => {
   };
 
   const doCalc = useCallback(() => {
-    const r = bonusMode === "50"
-      ? computeBase50(pf(b1), pf(b2), pf(b3), pf(b4), pf(eb), pf(es), pf(lot))
-      : computeBase(pf(b1), pf(b2), pf(b3), pf(b4), pf(eb), pf(es), pf(lot));
+    const r = computeBase(pf(b1), pf(b2), pf(b3), pf(eb), pf(es), pf(lot));
     setBase(r);
     setM3(null);
-    setM4b(false);
-    setM4s(false);
     setActM3("");
-    setActM4b("");
-    setActM4s("");
     if (typeof window !== "undefined") {
       try {
         const data = {
           b1,
           b2,
           b3,
-          b4,
           eb,
           es,
           lot,
-          bonusMode,
           base: r,
           m3: null,
-          m4b: false,
-          m4s: false,
-          actM3: "",
-          actM4b: "",
-          actM4s: ""
+          actM3: ""
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch { }
     }
-  }, [b1, b2, b3, b4, eb, es, lot, STORAGE_KEY, bonusMode]);
+  }, [b1, b2, b3, eb, es, lot, STORAGE_KEY]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -441,17 +370,12 @@ const Page = () => {
         setB1("");
         setB2("");
         setB3("");
-        setB4("");
         setEb("");
         setEs("");
-        setLot("0.05");
+        setLot("0.07");
         setBase(null);
         setM3(null);
-        setM4b(false);
-        setM4s(false);
         setActM3("");
-        setActM4b("");
-        setActM4s("");
         setStateHydrated(true);
         return;
       }
@@ -460,31 +384,16 @@ const Page = () => {
         setB1(data.b1 ?? "");
         setB2(data.b2 ?? "");
         setB3(data.b3 ?? "");
-        setB4(data.b4 ?? "");
         setEb(data.eb ?? "");
         setEs(data.es ?? "");
-        setLot(data.lot ?? "0.05");
-        setBonusMode(data.bonusMode ?? "20");
+        setLot(data.lot ?? "0.07");
         setBase(data.base ?? null);
         setM3(data.m3 ?? null);
-        setM4b(!!data.m4b);
-        setM4s(!!data.m4s);
         setActM3(data.actM3 ?? "");
-        setActM4b(data.actM4b ?? "");
-        setActM4s(data.actM4s ?? "");
       }
     } catch { }
     setStateHydrated(true);
   }, [STORAGE_KEY]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !stateHydrated) return;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const prev = raw ? JSON.parse(raw) : {};
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...prev, bonusMode }));
-    } catch { }
-  }, [bonusMode, STORAGE_KEY, stateHydrated]);
 
   // Không tự tính toán khi F5; chỉ hiển thị nếu đã có base trong localStorage
 
@@ -494,7 +403,6 @@ const Page = () => {
       (b1 && b1.trim().length) ||
       (b2 && b2.trim().length) ||
       (b3 && b3.trim().length) ||
-      (b4 && b4.trim().length) ||
       (eb && eb.trim().length) ||
       (es && es.trim().length);
     if (!hasInputs && !base) return;
@@ -505,22 +413,16 @@ const Page = () => {
         b1: prev.b1 ?? b1,
         b2: prev.b2 ?? b2,
         b3: prev.b3 ?? b3,
-        b4: prev.b4 ?? b4,
         eb: prev.eb ?? eb,
         es: prev.es ?? es,
         lot: prev.lot ?? lot,
-        bonusMode: prev.bonusMode ?? bonusMode,
         base,
         m3,
-        m4b,
-        m4s,
-        actM3,
-        actM4b,
-        actM4s
+        actM3
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch { }
-  }, [base, m3, m4b, m4s, actM3, actM4b, actM4s, b1, b2, b3, b4, eb, es, lot, bonusMode]);
+  }, [base, m3, actM3, b1, b2, b3, eb, es, lot]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -528,7 +430,6 @@ const Page = () => {
       (b1 && b1.trim().length) ||
       (b2 && b2.trim().length) ||
       (b3 && b3.trim().length) ||
-      (b4 && b4.trim().length) ||
       (eb && eb.trim().length) ||
       (es && es.trim().length);
     if (!hasInputs) return;
@@ -540,39 +441,23 @@ const Page = () => {
         b1,
         b2,
         b3,
-        b4,
         eb,
         es,
         lot
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch { }
-  }, [b1, b2, b3, b4, eb, es, lot]);
+  }, [b1, b2, b3, eb, es, lot]);
 
   const tickM3 = useCallback((type) => {
     setM3((prev) => {
       const wantUntick = prev === type;
-      if (wantUntick && (m4b || m4s)) {
-        return prev;
-      }
       const next = wantUntick ? null : type;
       setActM3("");
-      if (!wantUntick) {
-        setM4b(false);
-        setM4s(false);
-        setActM4b("");
-        setActM4s("");
-      } else {
-        setM4b(false);
-        setM4s(false);
-        setActM4b("");
-        setActM4s("");
-      }
       const hasInputs =
         (b1 && b1.trim().length) ||
         (b2 && b2.trim().length) ||
         (b3 && b3.trim().length) ||
-        (b4 && b4.trim().length) ||
         (eb && eb.trim().length) ||
         (es && es.trim().length);
       if (hasInputs && typeof window !== "undefined") {
@@ -584,132 +469,14 @@ const Page = () => {
             JSON.stringify({
               ...prevData,
               m3: next,
-              m4b: false,
-              m4s: false,
-              actM3: "",
-              actM4b: "",
-              actM4s: ""
+              actM3: ""
             })
           );
         } catch { }
       }
       return next;
     });
-  }, [m4b, m4s, STORAGE_KEY, b1, b2, b3, b4, eb, es]);
-
-  const tickM4Buy = () => {
-    if (m4b) {
-      setM4b(false);
-      setM4s(false);
-      setActM4b("");
-      setActM4s("");
-      const hasInputs =
-        (b1 && b1.trim().length) ||
-        (b2 && b2.trim().length) ||
-        (b3 && b3.trim().length) ||
-        (b4 && b4.trim().length) ||
-        (eb && eb.trim().length) ||
-        (es && es.trim().length);
-      if (hasInputs && typeof window !== "undefined") {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          const prevData = raw ? JSON.parse(raw) : {};
-          localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({
-              ...prevData,
-              m4b: false,
-              m4s: false,
-              actM4b: "",
-              actM4s: ""
-            })
-          );
-        } catch { }
-      }
-    } else {
-      setM4b(true);
-      setM4s(false);
-      setActM4s("");
-      const hasInputs =
-        (b1 && b1.trim().length) ||
-        (b2 && b2.trim().length) ||
-        (b3 && b3.trim().length) ||
-        (b4 && b4.trim().length) ||
-        (eb && eb.trim().length) ||
-        (es && es.trim().length);
-      if (hasInputs && typeof window !== "undefined") {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          const prevData = raw ? JSON.parse(raw) : {};
-          localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({
-              ...prevData,
-              m4b: true,
-              m4s: false
-            })
-          );
-        } catch { }
-      }
-    }
-  };
-
-  const tickM4Sell = () => {
-    if (m4s) {
-      setM4s(false);
-      setM4b(false);
-      setActM4s("");
-      setActM4b("");
-      const hasInputs =
-        (b1 && b1.trim().length) ||
-        (b2 && b2.trim().length) ||
-        (b3 && b3.trim().length) ||
-        (b4 && b4.trim().length) ||
-        (eb && eb.trim().length) ||
-        (es && es.trim().length);
-      if (hasInputs && typeof window !== "undefined") {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          const prevData = raw ? JSON.parse(raw) : {};
-          localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({
-              ...prevData,
-              m4s: false,
-              m4b: false,
-              actM4s: "",
-              actM4b: ""
-            })
-          );
-        } catch { }
-      }
-    } else {
-      setM4s(true);
-      setM4b(false);
-      setActM4b("");
-      const hasInputs =
-        (b1 && b1.trim().length) ||
-        (b2 && b2.trim().length) ||
-        (b3 && b3.trim().length) ||
-        (b4 && b4.trim().length) ||
-        (eb && eb.trim().length) ||
-        (es && es.trim().length);
-      if (hasInputs && typeof window !== "undefined") {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          const prevData = raw ? JSON.parse(raw) : {};
-          localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({
-              ...prevData,
-              m4s: true,
-              m4b: false
-            })
-          );
-        } catch { }
-      }
-    }
-  };
+  }, [STORAGE_KEY, b1, b2, b3, eb, es]);
 
   const onActM3Change = (val) => {
     setActM3(val);
@@ -718,30 +485,6 @@ const Page = () => {
         const raw = localStorage.getItem(STORAGE_KEY);
         const prevData = raw ? JSON.parse(raw) : {};
         const data = { ...prevData, actM3: val };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch {}
-    }
-  };
-
-  const onActM4bChange = (val) => {
-    setActM4b(val);
-    if (typeof window !== "undefined") {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        const prevData = raw ? JSON.parse(raw) : {};
-        const data = { ...prevData, actM4b: val };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch {}
-    }
-  };
-
-  const onActM4sChange = (val) => {
-    setActM4s(val);
-    if (typeof window !== "undefined") {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        const prevData = raw ? JSON.parse(raw) : {};
-        const data = { ...prevData, actM4s: val };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch {}
     }
@@ -774,22 +517,18 @@ const Page = () => {
   let disp = null;
   if (base) {
     if (m3) {
-      const f = computeFinal(
+      disp = computeFinal(
         base,
         m3,
-        pf(actM3),
-        m4b ? pf(actM4b) : 0,
-        m4s ? pf(actM4s) : 0
+        pf(actM3)
       );
-      disp = f;
     } else {
       disp = {
         m3_setup: null,
         m3_sl: null,
-        m4b: base.m4d_b,
-        m4s: base.m4d_s,
-        m1tp: base.m4d_s.sl - 0.9,
-        m2tp: base.m4d_b.sl + 0.9,
+        m3_tp: null,
+        m1tp: base.m1tp,
+        m2tp: base.m2tp,
         adjusted: false,
       };
     }
@@ -849,38 +588,14 @@ const Page = () => {
           <div className="text-blue-300 tracking-widest text-[10px]">BY TRAN DUC TOAN</div>
         </div>
 
-        {/* CHỌN CHƯƠNG TRÌNH BONUS */}
-        <Card className="mb-3">
-          <div className="text-xs tracking-widest text-blue-500 mb-3">▸ CHƯƠNG TRÌNH BONUS</div>
-          <div className="flex gap-6">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <Checkbox
-                checked={bonusMode === "20"}
-                onChange={() => { setBonusMode("20"); setBase(null); }}
-              />
-              <span className="text-sm font-semibold text-green-400">BONUS 20%</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <Checkbox
-                checked={bonusMode === "50"}
-                onChange={() => { setBonusMode("50"); setBase(null); }}
-              />
-              <span className="text-sm font-semibold text-yellow-400">BONUS 50%</span>
-            </label>
-          </div>
-          <div className="mt-2 text-[10px] text-blue-400">
-            {bonusMode === "20" ? "Đang dùng: Bonus 20% — công thức gốc" : "Đang dùng: Bonus 50% — công thức SL Máy 1 đã điều chỉnh"}
-          </div>
-        </Card>
-
         <Card>
           <div className="flex justify-between items-center mb-2">
-            <div className="text-xs tracking-widest text-blue-500">▸ BƯỚC 1 — SỐ DƯ 4 MÁY</div>
+            <div className="text-xs tracking-widest text-blue-500">▸ BƯỚC 1 — SỐ DƯ 3 MÁY</div>
             <Button danger ghost size="small" onClick={clearAll}>
               ✕ XOÁ
             </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <div className="text-xs text-blue-500 mb-1">MÁY 1 ($)</div>
               <Input value={b1} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setB1(numOnly(e.target.value))} />
@@ -892,10 +607,6 @@ const Page = () => {
             <div>
               <div className="text-xs text-blue-500 mb-1">MÁY 3 ($)</div>
               <Input value={b3} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setB3(numOnly(e.target.value))} />
-            </div>
-            <div>
-              <div className="text-xs text-blue-500 mb-1">MÁY 4 ($)</div>
-              <Input value={b4} inputMode="numeric" pattern="[0-9]*" onChange={(e) => setB4(numOnly(e.target.value))} />
             </div>
           </div>
         </Card>
@@ -977,6 +688,11 @@ const Page = () => {
                       value={m3 === "buy" && disp.m3_sl != null ? disp.m3_sl : base.m3b.sl}
                       type="sl"
                     />
+                    <DataRow
+                      label="TP"
+                      value={m3 === "buy" && disp.m3_tp != null ? disp.m3_tp : base.m3b.tp}
+                      type="tp"
+                    />
                     <ActualEntryZone visible={m3 === "buy"} value={actM3} onChange={onActM3Change} />
                   </Card>
                 )}
@@ -1005,54 +721,12 @@ const Page = () => {
                       value={m3 === "sell" && disp.m3_sl != null ? disp.m3_sl : base.m3s.sl}
                       type="sl"
                     />
+                    <DataRow
+                      label="TP"
+                      value={m3 === "sell" && disp.m3_tp != null ? disp.m3_tp : base.m3s.tp}
+                      type="tp"
+                    />
                     <ActualEntryZone visible={m3 === "sell"} value={actM3} onChange={onActM3Change} />
-                  </Card>
-                )}
-              </div>
-            </Card>
-
-            <Card className="mb-3" bodyStyle={{ padding: 12 }}>
-              <div className="flex justify-between items-center mb-2">
-                <div className="text-sm font-bold text-blue-200">MÁY 4</div>
-                <Tag color="gold">{m3 ? "Cập nhật" : "Pending"}</Tag>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {!m4s && (
-                  <Card size="small" bodyStyle={{ padding: 10 }}>
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="text-xs font-semibold" style={{ color: "#4ade80" }}>
-                        ▲ BUY LIMIT
-                      </div>
-                      {m3 && (
-                        <Checkbox
-                          checked={m4b}
-                          onChange={() => tickM4Buy()}
-                        />
-                      )}
-                    </div>
-                    <DataRow label="SETUP" value={disp.m4b.setup} type="setup" />
-                    <DataRow label="SL" value={disp.m4b.sl} type="sl" />
-                    <ActualEntryZone visible={m4b} value={actM4b} onChange={onActM4bChange} />
-                  </Card>
-                )}
-
-                {!m4b && (
-                  <Card size="small" bodyStyle={{ padding: 10 }}>
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="text-xs font-semibold" style={{ color: "#f87171" }}>
-                        ▼ SELL LIMIT
-                      </div>
-                      {m3 && (
-                        <Checkbox
-                          checked={m4s}
-                          onChange={() => tickM4Sell()}
-                        />
-                      )}
-                    </div>
-                    <DataRow label="SETUP" value={disp.m4s.setup} type="setup" />
-                    <DataRow label="SL" value={disp.m4s.sl} type="sl" />
-                    <ActualEntryZone visible={m4s} value={actM4s} onChange={onActM4sChange} />
                   </Card>
                 )}
               </div>

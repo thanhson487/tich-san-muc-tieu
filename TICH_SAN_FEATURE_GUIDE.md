@@ -32,9 +32,17 @@ Giao diện được phân chia thành 2 màn hình riêng biệt nhưng dùng c
  └── Tab 2: 📊 Dashboard Quản Lý (Portfolio Tracker)
 ```
 
-### Tab 1: Phân Tích DCA (DCA Scanner)
-- **Mục đích:** Quét dữ liệu kỹ thuật toàn bộ danh mục, so sánh giá hiện tại với đỉnh năm trước ($N-1$).
-- **Năm đỉnh:** Tự động cố định là năm $N-1$ (Ví dụ: Năm 2026 $\rightarrow$ Quét đỉnh năm 2025), không cần chọn thủ công.
+### Tab 1: Quét Tín Hiệu DCA (DCA Scanner)
+- **Mục đích:** Quét dữ liệu giá thị trường (VNDIRECT & DNSE) và đối chiếu giá hiện tại với giá đỉnh năm trước ($N-1$).
+- **🎯 Tính năng Tự Động Chọn Mã Theo Ngày (Daily Stock Picker - Danh Sách Động):**
+  - Tự động lấy danh mục mã động từ Firestore.
+  - Sắp xếp các mã theo thứ tự bảng chữ cái **A-Z**.
+  - **Chỉ chạy vào các ngày làm việc (Thứ 2 $\rightarrow$ Thứ 6):** Đếm số ngày làm việc từ mốc cơ sở `BASE_DATE` (06/02/2026) đến hôm nay $\rightarrow$ Lấy phần dư (`index = count % tổng_số_mã`) để chọn **duy nhất 1 mã cổ phiếu hôm nay**.
+  - **Ngày cuối tuần (Thứ 7, Chủ Nhật):** Hệ thống hiển thị thông báo *Thị trường đóng cửa cuối tuần*.
+  - **Giao diện trực quan:** Banner nổi bật trên đầu hiển thị đầy đủ thông tin mã hôm nay, giá hiện tại, % giảm từ đỉnh và nhãn **`🌟 Hôm nay`** trong bảng.
+- **Trạng thái tín hiệu (2 trạng thái tinh gọn):**
+  - **`⚡ DCA 1..4 · X%` (Màu xanh lá nhấp nháy):** Khi giá rơi vào vùng chiết khấu và bạn **chưa giải ngân** mức đó.
+  - **`Quan sát` (Màu xám):** Khi chưa có tín hiệu mua mới hoặc bạn đã tích chọn mua mức đó rồi.
 - **Cấu trúc bảng 5 cột:**
   1. `Mã CK`: Tên mã cổ phiếu (căn trái, font-mono).
   2. `Giá hiện tại`: Định dạng `xx.xxx ₫` (font-mono, căn phải).

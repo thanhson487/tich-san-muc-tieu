@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { StockYearInfo } from '../stockService';
 import { getDcaAnalysis, DcaAnalysisResult } from '@/utils/dcaCalculation';
 import { StockTrackerDoc } from '@/services/stockFirebaseService';
+import { getTodayStock } from '@/utils/dailyStockPicker';
 
 interface DcaScannerViewProps {
     symbols: string[];
@@ -34,6 +35,20 @@ export default function DcaScannerView({
     error,
 }: DcaScannerViewProps) {
     const peakYear = selectedYear - 1;
+
+    // Tự động chọn 1 mã cổ phiếu luân phiên theo ngày làm việc từ danh mục động
+    const todayPick = useMemo(() => getTodayStock(symbols), [symbols]);
+    const todayPriceInfo = todayPick.symbol ? priceDataMap[todayPick.symbol] : null;
+    const todayDocItem = todayPick.symbol ? watchlist.find((w) => w.symbol === todayPick.symbol) : null;
+    const todaySignal = todayPick.symbol && todayPriceInfo
+        ? getDcaAnalysis(
+            todayPick.symbol,
+            todayPriceInfo.currentPrice,
+            todayPriceInfo.yearHigh,
+            todayDocItem?.dcaFilled,
+            todayDocItem?.dropLevels
+        )
+        : null;
 
     const tableData: ScannerTableItem[] = useMemo(() => {
         return symbols.map((sym) => {
@@ -106,6 +121,71 @@ export default function DcaScannerView({
                 </div>
             </div>
 
+            {/* Daily Stock Picker Banner */}
+            <div className="p-4 rounded-xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-[#131722] to-[#1E222D] shadow-xl relative overflow-hidden">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xl font-bold shrink-0 shadow-inner">
+                            🎯
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                                    Cổ phiếu tích sản hôm nay
+                                </span>
+                                <span className="text-xs text-gray-400 font-mono">
+                                    ({new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })})
+                                </span>
+                            </div>
+
+                            {todayPick.isWeekend ? (
+                                <div className="text-sm font-medium text-amber-400/90 mt-1 flex items-center gap-1.5">
+                                    <span>☕</span> Thị trường đóng cửa cuối tuần · Chu kỳ luân phiên tiếp tục vào Thứ Hai tuần tới
+                                </div>
+                            ) : todayPick.symbol ? (
+                                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                    <span className="text-lg font-mono font-black text-white bg-indigo-600/40 px-3 py-0.5 rounded-lg border border-indigo-500/50 shadow-sm flex items-center gap-1.5">
+                                        ⭐ {todayPick.symbol}
+                                    </span>
+                                    <span className="text-xs text-gray-400 font-mono">
+                                        Giá: <strong className="text-gray-100">{formatPrice(todayPriceInfo?.currentPrice || 0)} ₫</strong>
+                                    </span>
+                                    <span className="text-xs text-gray-400 font-mono">
+                                        Đỉnh {peakYear}: <strong className="text-gray-300">{formatPrice(todayPriceInfo?.yearHigh || 0)} ₫</strong>
+                                    </span>
+                                    <span className="text-xs text-gray-400 font-mono">
+                                        Giảm từ đỉnh: <strong className="text-rose-400">{(todayPriceInfo?.dropPercent || 0).toFixed(2)}%</strong>
+                                    </span>
+                                    {todaySignal && (
+                                        todaySignal.type === 'ACTIVE' ? (
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 animate-pulse">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                                DCA {todaySignal.tierIndex} · {todaySignal.weightPercent}%
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-400 border border-gray-700/40">
+                                                Quan sát
+                                            </span>
+                                        )
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-xs text-gray-400 mt-1">Chưa có mã cổ phiếu trong danh mục</div>
+                            )}
+                        </div>
+                    </div>
+
+                    {!todayPick.isWeekend && todayPick.symbol && (
+                        <div className="flex items-center gap-2 self-start md:self-center bg-gray-800/70 px-3 py-1.5 rounded-lg border border-gray-700/50 shrink-0">
+                            <span className="text-xs text-gray-400">Thứ tự luân phiên:</span>
+                            <span className="text-xs font-mono font-bold text-indigo-300">
+                                Mã #{todayPick.index + 1} / {todayPick.total}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            </div>
+
             {error && (
                 <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-center gap-2">
                     <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,14 +219,33 @@ export default function DcaScannerView({
                                 tableData.map((item) => {
                                     const { symbol, currentPrice, yearHigh, dropPercent, signal } = item;
                                     const isDcaActive = signal.type === 'ACTIVE';
+                                    const isTodayPick = todayPick.symbol === symbol;
 
                                     return (
-                                        <tr key={symbol} className="hover:bg-[#1E222D]/60 transition-colors">
+                                        <tr
+                                            key={symbol}
+                                            className={`transition-colors ${
+                                                isTodayPick
+                                                    ? 'bg-indigo-950/20 hover:bg-indigo-950/30'
+                                                    : 'hover:bg-[#1E222D]/60'
+                                            }`}
+                                        >
                                             {/* Mã CK */}
                                             <td className="py-3 px-4 text-left">
-                                                <span className="font-bold tracking-wide text-white bg-gray-800/80 px-2.5 py-1 rounded border border-gray-700/60 text-xs font-mono inline-flex items-center gap-1.5">
+                                                <span
+                                                    className={`font-bold tracking-wide text-xs font-mono inline-flex items-center gap-1.5 px-2.5 py-1 rounded border ${
+                                                        isTodayPick
+                                                            ? 'bg-indigo-600/30 text-indigo-200 border-indigo-500/60 shadow-sm'
+                                                            : 'bg-gray-800/80 text-white border-gray-700/60'
+                                                    }`}
+                                                >
                                                     {symbol}
-                                                    {isDcaActive && (
+                                                    {isTodayPick && (
+                                                        <span className="text-[10px] bg-indigo-500 text-white font-sans px-1.5 py-0.5 rounded font-semibold leading-none">
+                                                            Hôm nay
+                                                        </span>
+                                                    )}
+                                                    {isDcaActive && !isTodayPick && (
                                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                                                     )}
                                                 </span>

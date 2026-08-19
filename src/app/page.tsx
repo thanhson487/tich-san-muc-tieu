@@ -13,9 +13,8 @@ export default function Home() {
 
   useEffect(() => {
     if (pathname === '/') {
-      router.replace('/trade');
+      router.replace('/tich-san');
     }
-
   }, [pathname, router]);
   return (
     <main>

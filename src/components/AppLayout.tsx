@@ -27,7 +27,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   useEffect(() => {
     if (pathname === '/') {
-      router.replace('/trade');
+      router.replace('/tich-san');
     }
   }, [pathname, router]);
   useEffect(() => {

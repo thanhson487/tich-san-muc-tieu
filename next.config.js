@@ -9,6 +9,15 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/tich-san',
+        permanent: false,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

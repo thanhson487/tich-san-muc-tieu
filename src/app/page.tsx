@@ -8,18 +8,18 @@ import { useUIStore } from '@/store/useUIStore';
 import { useRouter, usePathname } from 'next/navigation';
 
 export default function Home() {
-    const router = useRouter();
+  const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     if (pathname === '/') {
       router.replace('/trade');
     }
-   
+
   }, [pathname, router]);
   return (
     <main>
-   
+
     </main>
   );
 }

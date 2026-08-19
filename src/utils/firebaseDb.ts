@@ -120,3 +120,59 @@ export async function fbGetAveragePriceState(userId: string) {
   if (!snap.exists()) return null;
   return snap.data();
 }
+
+const TICH_SAN_COLLECTION = 'tich_san_settings';
+
+export const DEFAULT_TICH_SAN_SYMBOLS = [
+  "ACB",
+  "DBC",
+  "FPT",
+  "HDG",
+  "HPG",
+  "IDC",
+  "KDH",
+  "MBB",
+  "REE",
+  "SSI",
+  "TCB",
+  "VPB",
+];
+
+export async function fbGetTichSanSymbols(userId?: string): Promise<string[]> {
+  try {
+    const db = getDb();
+    const docId = userId || 'default_user';
+    const snap = await getDoc(doc(db, TICH_SAN_COLLECTION, docId));
+    if (snap.exists() && Array.isArray(snap.data()?.symbols) && snap.data().symbols.length > 0) {
+      return snap.data().symbols;
+    }
+    // Nếu chưa có, tự khởi tạo danh sách mặc định lên Firebase
+    await setDoc(doc(db, TICH_SAN_COLLECTION, docId), {
+      symbols: DEFAULT_TICH_SAN_SYMBOLS,
+      updatedAt: Date.now(),
+    });
+    return DEFAULT_TICH_SAN_SYMBOLS;
+  } catch (err) {
+    console.error('Lỗi khi lấy danh sách mã tích sản từ Firebase:', err);
+    return DEFAULT_TICH_SAN_SYMBOLS;
+  }
+}
+
+export async function fbSaveTichSanSymbols(symbols: string[], userId?: string): Promise<void> {
+  try {
+    const db = getDb();
+    const docId = userId || 'default_user';
+    await setDoc(
+      doc(db, TICH_SAN_COLLECTION, docId),
+      {
+        symbols,
+        updatedAt: Date.now(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error('Lỗi khi lưu danh sách mã tích sản vào Firebase:', err);
+    throw err;
+  }
+}
+

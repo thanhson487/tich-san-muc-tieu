@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { VnStockClient, Interval, DataSource } from "vn-stock-sdk";
 import {
     DROP_LEVELS,
     DEFAULT_DROP_LEVELS,
@@ -8,12 +7,6 @@ import {
     getDcaScannerSignal,
     DcaScannerSignal,
 } from "@/utils/dcaCalculation";
-
-const client = new VnStockClient({
-    debug: false,
-    timeout: 15000,
-    retries: 2,
-});
 
 interface StockYearInfo {
     symbol: string;
@@ -31,91 +24,96 @@ function normalizePrice(val: number): number {
     return val < 1000 ? Math.round(val * 1000) : Math.round(val);
 }
 
+/**
+ * Lấy dữ liệu nến từ VNDIRECT
+ */
+async function fetchFromVndirect(symbol: string, fromTimestamp: number, toTimestamp: number) {
+    const url = `https://dchart-api.vndirect.com.vn/dchart/history?resolution=D&symbol=${symbol}&from=${fromTimestamp}&to=${toTimestamp}`;
+    const res = await fetch(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://dchart.vndirect.com.vn/',
+        },
+        next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.s === 'ok' && Array.isArray(data.h) && data.h.length > 0) {
+        return {
+            highs: data.h as number[],
+            closes: data.c as number[],
+            timestamps: data.t as number[],
+        };
+    }
+    return null;
+}
+
+/**
+ * Lấy dữ liệu nến từ DNSE (Fallback)
+ */
+async function fetchFromDnse(symbol: string, fromTimestamp: number, toTimestamp: number) {
+    const url = `https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?symbol=${symbol}&from=${fromTimestamp}&to=${toTimestamp}&resolution=1D`;
+    const res = await fetch(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0',
+        },
+        next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && Array.isArray(data.h) && data.h.length > 0) {
+        return {
+            highs: data.h as number[],
+            closes: data.c as number[],
+            timestamps: data.t as number[],
+        };
+    }
+    return null;
+}
+
 async function fetchStockYearInfo(symbol: string, selectedYear: number): Promise<StockYearInfo> {
     const sym = symbol.toUpperCase();
     const targetHighYear = selectedYear - 1;
 
-    const highStart = `${targetHighYear}-01-01`;
-    const highEnd = `${targetHighYear}-12-31`;
+    const fromHigh = Math.floor(new Date(`${targetHighYear}-01-01T00:00:00Z`).getTime() / 1000);
+    const toHigh = Math.floor(new Date(`${targetHighYear}-12-31T23:59:59Z`).getTime() / 1000);
 
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-    const curStart = `${now.getFullYear()}-01-01`;
+    const fromCur = Math.floor(new Date(`${selectedYear}-01-01T00:00:00Z`).getTime() / 1000);
+    const toCur = Math.floor(Date.now() / 1000);
 
     // 1. Lấy nến lịch sử của năm đỉnh (targetHighYear)
-    let historyHigh: any[] = [];
-    try {
-        historyHigh = await client.quote(sym).history({
-            start: highStart,
-            end: highEnd,
-            interval: Interval.D1,
-            source: DataSource.VNDIRECT,
-        });
-    } catch (e) {
-        console.warn(`[VNDIRECT] Lỗi lấy đỉnh ${targetHighYear} cho ${sym}, thử DNSE...`, e);
+    let highData = await fetchFromVndirect(sym, fromHigh, toHigh);
+    if (!highData) {
+        highData = await fetchFromDnse(sym, fromHigh, toHigh);
     }
 
-    if (!historyHigh || historyHigh.length === 0) {
-        try {
-            historyHigh = await client.quote(sym).history({
-                start: highStart,
-                end: highEnd,
-                interval: Interval.D1,
-                source: DataSource.DNSE,
-            });
-        } catch (e) {
-            console.warn(`[DNSE] Lỗi lấy đỉnh ${targetHighYear} cho ${sym}:`, e);
-        }
+    if (!highData || highData.highs.length === 0) {
+        throw new Error(`Không tìm thấy dữ liệu giá năm ${targetHighYear} cho mã ${sym}`);
     }
 
-    if (!historyHigh || historyHigh.length === 0) {
-        throw new Error(`Không tìm thấy dữ liệu nến năm ${targetHighYear} cho mã ${sym}`);
+    const validHighs = highData.highs.filter((h) => Number.isFinite(h) && h > 0);
+    if (validHighs.length === 0) {
+        throw new Error(`Dữ liệu giá năm ${targetHighYear} của mã ${sym} không hợp lệ`);
     }
 
-    const validHighData = historyHigh.filter(
-        (item) => Number.isFinite(Number(item.high)) && Number(item.high) > 0
-    );
-
-    if (validHighData.length === 0) {
-        throw new Error(`Dữ liệu nến năm ${targetHighYear} của mã ${sym} không hợp lệ`);
-    }
-
-    const rawHigh = Math.max(...validHighData.map((item) => Number(item.high)));
+    const rawHigh = Math.max(...validHighs);
     const yearHigh = normalizePrice(rawHigh);
 
-    // 2. Lấy giá hiện tại (phiên mới nhất)
-    let historyCurrent: any[] = [];
-    try {
-        historyCurrent = await client.quote(sym).history({
-            start: curStart,
-            end: todayStr,
-            interval: Interval.D1,
-            source: DataSource.VNDIRECT,
-        });
-    } catch (e) {
-        console.warn(`[VNDIRECT] Lỗi lấy giá hiện tại cho ${sym}, thử DNSE...`, e);
+    // 2. Lấy giá hiện tại (năm nay hoặc nến mới nhất)
+    let currentData = await fetchFromVndirect(sym, fromCur, toCur);
+    if (!currentData) {
+        currentData = await fetchFromDnse(sym, fromCur, toCur);
     }
 
-    if (!historyCurrent || historyCurrent.length === 0) {
-        try {
-            historyCurrent = await client.quote(sym).history({
-                start: curStart,
-                end: todayStr,
-                interval: Interval.D1,
-                source: DataSource.DNSE,
-            });
-        } catch (e) {
-            console.warn(`[DNSE] Lỗi lấy giá hiện tại cho ${sym}:`, e);
-        }
+    let currentPrice = 0;
+    if (currentData && currentData.closes.length > 0) {
+        const latestClose = currentData.closes[currentData.closes.length - 1];
+        currentPrice = normalizePrice(latestClose);
+    } else {
+        // Fallback về nến cuối của năm đỉnh nếu năm nay chưa có phiên
+        const lastHighClose = highData.closes[highData.closes.length - 1];
+        currentPrice = normalizePrice(lastHighClose);
     }
-
-    // Nếu không lấy được năm hiện tại, lấy nến cuối cùng của năm đỉnh
-    const currentDataSource = historyCurrent && historyCurrent.length > 0 ? historyCurrent : validHighData;
-    const sortedCurrent = [...currentDataSource].sort(
-        (a, b) => new Date(String(a.date || a.time)).getTime() - new Date(String(b.date || b.time)).getTime()
-    );
-    const latestBar = sortedCurrent[sortedCurrent.length - 1];
-    const currentPrice = normalizePrice(Number(latestBar.close || latestBar.high));
 
     // 3. Tính mức giảm từ đỉnh
     const dropPercent = yearHigh > 0 ? ((currentPrice - yearHigh) / yearHigh) * 100 : 0;

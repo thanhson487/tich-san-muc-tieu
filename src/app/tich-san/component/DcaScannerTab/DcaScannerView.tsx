@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { StockYearInfo } from '../stockService';
-import { getDcaScannerSignal, DcaScannerSignal } from '@/utils/dcaCalculation';
+import { getDcaAnalysis, DcaAnalysisResult } from '@/utils/dcaCalculation';
 import { StockTrackerDoc } from '@/services/stockFirebaseService';
 
 interface DcaScannerViewProps {
@@ -20,7 +20,8 @@ interface ScannerTableItem {
     currentPrice: number;
     yearHigh: number;
     dropPercent: number;
-    signal: DcaScannerSignal;
+    signal: DcaAnalysisResult;
+    docItem?: StockTrackerDoc;
 }
 
 export default function DcaScannerView({
@@ -42,7 +43,13 @@ export default function DcaScannerView({
             const dropPercent = priceInfo?.dropPercent || 0;
 
             const docItem = watchlist.find((w) => w.symbol === sym);
-            const signal = getDcaScannerSignal(sym, currentPrice, yearHigh, docItem?.dropLevels);
+            const signal = getDcaAnalysis(
+                sym,
+                currentPrice,
+                yearHigh,
+                docItem?.dcaFilled,
+                docItem?.dropLevels
+            );
 
             return {
                 symbol: sym,
@@ -50,6 +57,7 @@ export default function DcaScannerView({
                 yearHigh,
                 dropPercent,
                 signal,
+                docItem,
             };
         });
     }, [symbols, watchlist, priceDataMap]);
@@ -129,8 +137,13 @@ export default function DcaScannerView({
                                 </tr>
                             ) : (
                                 tableData.map((item) => {
-                                    const { symbol, currentPrice, yearHigh, dropPercent, signal } = item;
-                                    const isDcaActive = signal.tierIndex > 0;
+                                    const { symbol, currentPrice, yearHigh, dropPercent, signal, docItem } = item;
+                                    const isDcaActive = signal.type === 'ACTIVE';
+                                    const isDcaFilled = signal.type === 'FILLED';
+
+                                    const filledCount = docItem?.dcaFilled
+                                        ? Object.values(docItem.dcaFilled).filter(Boolean).length
+                                        : 0;
 
                                     return (
                                         <tr key={symbol} className="hover:bg-[#1E222D]/60 transition-colors">
@@ -164,12 +177,21 @@ export default function DcaScannerView({
                                             {/* Trạng thái tín hiệu */}
                                             <td className="py-3 px-4 text-center">
                                                 {isDcaActive ? (
-                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 animate-pulse">
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 animate-pulse">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                                                         {signal.status}
                                                     </span>
+                                                ) : isDcaFilled ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/25">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                                                        {signal.status}
+                                                    </span>
+                                                ) : filledCount > 0 ? (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800/80 text-gray-300 border border-gray-700/50">
+                                                        Đã gom {filledCount}/4 mức
+                                                    </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800/80 text-gray-400 border border-gray-700/40">
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800/80 text-gray-500 border border-gray-700/40">
                                                         Quan sát
                                                     </span>
                                                 )}

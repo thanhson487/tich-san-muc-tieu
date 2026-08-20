@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import { Tooltip, message } from 'antd';
 import { updateDcaCheckbox } from '@/services/stockFirebaseService';
+import { DROP_LEVELS, DEFAULT_DROP_LEVELS } from '@/utils/dcaConfig';
 
 interface DcaCheckboxGroupProps {
     symbol: string;
-    dcaFilled: {
+    dcaFilled?: {
         dca1?: boolean;
         dca2?: boolean;
         dca3?: boolean;
@@ -14,22 +15,35 @@ interface DcaCheckboxGroupProps {
     };
     userId?: string;
     onUpdate?: () => void;
+    dropLevels?: number[];
 }
 
-const TIERS = [
-    { key: 'dca1' as const, num: 1, name: 'DCA 1 (15%)' },
-    { key: 'dca2' as const, num: 2, name: 'DCA 2 (25%)' },
-    { key: 'dca3' as const, num: 3, name: 'DCA 3 (35%)' },
-    { key: 'dca4' as const, num: 4, name: 'DCA 4 (25%)' },
-];
+const TIER_KEYS = ['dca1', 'dca2', 'dca3', 'dca4'] as const;
 
 export default function DcaCheckboxGroup({
     symbol,
     dcaFilled,
     userId,
     onUpdate,
+    dropLevels,
 }: DcaCheckboxGroupProps) {
     const [loadingTier, setLoadingTier] = useState<number | null>(null);
+
+    const levels = dropLevels && dropLevels.length === 4
+        ? dropLevels
+        : (DROP_LEVELS[symbol?.toUpperCase()] || DEFAULT_DROP_LEVELS);
+
+    const tiers = TIER_KEYS.map((key, index) => {
+        const num = index + 1;
+        const targetDrop = levels[index] !== undefined ? levels[index] : DEFAULT_DROP_LEVELS[index];
+        const dropPercentStr = targetDrop > 0 ? `-${targetDrop}%` : `${targetDrop}%`;
+        return {
+            key,
+            num,
+            dropPercentStr,
+            name: `DCA ${num} (${dropPercentStr})`,
+        };
+    });
 
     const handleToggle = async (
         tierKey: 'dca1' | 'dca2' | 'dca3' | 'dca4',
@@ -54,7 +68,7 @@ export default function DcaCheckboxGroup({
 
     return (
         <div className="flex items-center justify-center gap-1.5">
-            {TIERS.map(({ key, num, name }) => {
+            {tiers.map(({ key, num, name }) => {
                 const isFilled = Boolean(dcaFilled?.[key]);
                 const isLoading = loadingTier === num;
 
@@ -85,3 +99,4 @@ export default function DcaCheckboxGroup({
         </div>
     );
 }
+

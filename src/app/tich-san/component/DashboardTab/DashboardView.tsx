@@ -179,6 +179,7 @@ export default function DashboardView({
                                                     symbol={symbol}
                                                     dcaFilled={doc.dcaFilled}
                                                     userId={userId}
+                                                    dropLevels={doc.dropLevels}
                                                 />
                                             </td>
 

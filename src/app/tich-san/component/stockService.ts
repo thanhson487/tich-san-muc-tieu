@@ -16,17 +16,14 @@ export interface StockYearInfo {
 }
 
 export async function fetchStockAnalysisBatch(
-    symbols: string[],
-    year?: number
+    symbols: string[]
 ): Promise<StockYearInfo[]> {
     if (!symbols || symbols.length === 0) {
         return [];
     }
 
-    const currentYear = year || new Date().getFullYear();
     const query = new URLSearchParams({
         symbols: symbols.join(','),
-        year: String(currentYear),
     });
 
     const res = await fetch(`/api/stock-analysis?${query.toString()}`);
@@ -41,10 +38,9 @@ export async function fetchStockAnalysisBatch(
 }
 
 export async function getStockYearInfo(
-    symbol: string,
-    year?: number
+    symbol: string
 ): Promise<StockYearInfo> {
-    const list = await fetchStockAnalysisBatch([symbol], year);
+    const list = await fetchStockAnalysisBatch([symbol]);
     if (list.length === 0) {
         throw new Error(`Không thể lấy dữ liệu cho mã ${symbol}`);
     }

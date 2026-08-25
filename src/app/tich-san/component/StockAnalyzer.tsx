@@ -50,8 +50,8 @@ export default function StockAnalyzer({ userId: propUserId }: StockAnalyzerProps
         };
     }, [effectiveUserId]);
 
-    // 2. Fetch dữ liệu giá chứng khoán
-    const fetchPrices = async (symbolsToFetch?: string[], targetYear?: number) => {
+    // 2. Fetch dữ liệu giá chứng khoán (365 ngày qua)
+    const fetchPrices = async (symbolsToFetch?: string[]) => {
         const symbols = symbolsToFetch || watchlist.map((w) => w.symbol);
         if (symbols.length === 0) return;
 
@@ -59,8 +59,7 @@ export default function StockAnalyzer({ userId: propUserId }: StockAnalyzerProps
         setError('');
 
         try {
-            const year = targetYear || selectedYear;
-            const results = await fetchStockAnalysisBatch(symbols, year);
+            const results = await fetchStockAnalysisBatch(symbols);
 
             const map: Record<string, StockYearInfo> = {};
             results.forEach((item) => {
@@ -83,7 +82,7 @@ export default function StockAnalyzer({ userId: propUserId }: StockAnalyzerProps
     useEffect(() => {
         if (watchlist.length > 0) {
             const symbols = watchlist.map((w) => w.symbol);
-            fetchPrices(symbols, selectedYear);
+            fetchPrices(symbols);
         }
     }, [watchlist.length]);
 
@@ -148,8 +147,7 @@ export default function StockAnalyzer({ userId: propUserId }: StockAnalyzerProps
                         watchlist={watchlist}
                         priceDataMap={priceDataMap}
                         loading={loading}
-                        selectedYear={selectedYear}
-                        onRefresh={() => fetchPrices(symbolsList, selectedYear)}
+                        onRefresh={() => fetchPrices(symbolsList)}
                         error={error}
                     />
                 )}
@@ -161,9 +159,8 @@ export default function StockAnalyzer({ userId: propUserId }: StockAnalyzerProps
                         priceDataMap={priceDataMap}
                         loading={loading}
                         userId={effectiveUserId}
-                        selectedYear={selectedYear}
-                        onRefresh={() => fetchPrices(symbolsList, selectedYear)}
-                        onStockAdded={(newSym) => fetchPrices([newSym], selectedYear)}
+                        onRefresh={() => fetchPrices(symbolsList)}
+                        onStockAdded={(newSym) => fetchPrices([newSym])}
                         error={error}
                     />
                 )}

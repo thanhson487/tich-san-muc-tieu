@@ -15,7 +15,7 @@ interface DashboardViewProps {
     priceDataMap: Record<string, StockYearInfo>;
     loading: boolean;
     userId?: string;
-    selectedYear: number;
+    selectedYear?: number;
     onRefresh: () => void;
     onStockAdded: (symbol: string) => void;
     error?: string;

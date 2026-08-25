@@ -74,23 +74,23 @@ async function fetchFromDnse(symbol: string, fromTimestamp: number, toTimestamp:
 async function fetchStockYearInfo(symbol: string): Promise<StockYearInfo> {
     const sym = symbol.toUpperCase();
 
-    // Lấy tròn 1 năm về trước (365 ngày) tính từ hiện tại
+    // Lấy tròn 2 năm về trước (730 ngày = 365 x 2) tính từ hiện tại
     const toTimestamp = Math.floor(Date.now() / 1000);
-    const fromTimestamp = toTimestamp - 365 * 24 * 60 * 60;
+    const fromTimestamp = toTimestamp - 2 * 365 * 24 * 60 * 60;
 
-    // 1. Lấy nến lịch sử trong 365 ngày gần nhất
+    // 1. Lấy nến lịch sử trong 2 năm gần nhất
     let chartData = await fetchFromVndirect(sym, fromTimestamp, toTimestamp);
     if (!chartData) {
         chartData = await fetchFromDnse(sym, fromTimestamp, toTimestamp);
     }
 
     if (!chartData || chartData.highs.length === 0) {
-        throw new Error(`Không tìm thấy dữ liệu giá 365 ngày qua cho mã ${sym}`);
+        throw new Error(`Không tìm thấy dữ liệu giá 2 năm qua cho mã ${sym}`);
     }
 
     const validHighs = chartData.highs.filter((h) => Number.isFinite(h) && h > 0);
     if (validHighs.length === 0) {
-        throw new Error(`Dữ liệu giá 365 ngày qua của mã ${sym} không hợp lệ`);
+        throw new Error(`Dữ liệu giá 2 năm qua của mã ${sym} không hợp lệ`);
     }
 
     const rawHigh = Math.max(...validHighs);
@@ -103,7 +103,7 @@ async function fetchStockYearInfo(symbol: string): Promise<StockYearInfo> {
         currentPrice = normalizePrice(latestClose);
     }
 
-    // 3. Tính mức giảm từ đỉnh 365 ngày
+    // 3. Tính mức giảm từ đỉnh 2 năm
     const dropPercent = yearHigh > 0 ? ((currentPrice - yearHigh) / yearHigh) * 100 : 0;
 
     // 4. Xác định trạng thái DCA

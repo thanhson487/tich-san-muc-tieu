@@ -91,7 +91,7 @@ export default function DcaScannerView({
                         Quét Tín Hiệu & Mức Chiết Khấu DCA
                     </h2>
                     <p className="text-xs text-gray-400 mt-1 mb-0">
-                        Phân tích mức giảm so với giá đỉnh 1 năm qua (365 ngày) để nhận diện vùng mua mục tiêu (±2%)
+                        Phân tích mức giảm so với giá đỉnh 2 năm qua (730 ngày) để nhận diện vùng mua mục tiêu (±2%)
                     </p>
                 </div>
 
@@ -150,7 +150,7 @@ export default function DcaScannerView({
                                         Giá: <strong className="text-gray-100">{formatPrice(todayPriceInfo?.currentPrice || 0)} ₫</strong>
                                     </span>
                                     <span className="text-xs text-gray-400 font-mono">
-                                        Đỉnh 1 năm (365N): <strong className="text-gray-300">{formatPrice(todayPriceInfo?.yearHigh || 0)} ₫</strong>
+                                        Đỉnh 2 năm (730N): <strong className="text-gray-300">{formatPrice(todayPriceInfo?.yearHigh || 0)} ₫</strong>
                                     </span>
                                     <span className="text-xs text-gray-400 font-mono">
                                         Giảm từ đỉnh: <strong className="text-rose-400">{(todayPriceInfo?.dropPercent || 0).toFixed(2)}%</strong>
@@ -202,7 +202,7 @@ export default function DcaScannerView({
                             <tr>
                                 <th className="py-3.5 px-4 text-left font-semibold">Mã CK</th>
                                 <th className="py-3.5 px-4 text-right font-semibold">Giá hiện tại</th>
-                                <th className="py-3.5 px-4 text-right font-semibold">Đỉnh 1 năm (365 ngày)</th>
+                                <th className="py-3.5 px-4 text-right font-semibold">Đỉnh 2 năm (730 ngày)</th>
                                 <th className="py-3.5 px-4 text-right font-semibold">% Giảm từ đỉnh</th>
                                 <th className="py-3.5 px-4 text-center font-semibold">Trạng thái tín hiệu</th>
                             </tr>

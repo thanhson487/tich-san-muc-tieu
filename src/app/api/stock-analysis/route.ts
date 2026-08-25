@@ -71,51 +71,39 @@ async function fetchFromDnse(symbol: string, fromTimestamp: number, toTimestamp:
     return null;
 }
 
-async function fetchStockYearInfo(symbol: string, selectedYear: number): Promise<StockYearInfo> {
+async function fetchStockYearInfo(symbol: string): Promise<StockYearInfo> {
     const sym = symbol.toUpperCase();
-    const targetHighYear = selectedYear - 1;
 
-    const fromHigh = Math.floor(new Date(`${targetHighYear}-01-01T00:00:00Z`).getTime() / 1000);
-    const toHigh = Math.floor(new Date(`${targetHighYear}-12-31T23:59:59Z`).getTime() / 1000);
+    // Lấy tròn 1 năm về trước (365 ngày) tính từ hiện tại
+    const toTimestamp = Math.floor(Date.now() / 1000);
+    const fromTimestamp = toTimestamp - 365 * 24 * 60 * 60;
 
-    const fromCur = Math.floor(new Date(`${selectedYear}-01-01T00:00:00Z`).getTime() / 1000);
-    const toCur = Math.floor(Date.now() / 1000);
-
-    // 1. Lấy nến lịch sử của năm đỉnh (targetHighYear)
-    let highData = await fetchFromVndirect(sym, fromHigh, toHigh);
-    if (!highData) {
-        highData = await fetchFromDnse(sym, fromHigh, toHigh);
+    // 1. Lấy nến lịch sử trong 365 ngày gần nhất
+    let chartData = await fetchFromVndirect(sym, fromTimestamp, toTimestamp);
+    if (!chartData) {
+        chartData = await fetchFromDnse(sym, fromTimestamp, toTimestamp);
     }
 
-    if (!highData || highData.highs.length === 0) {
-        throw new Error(`Không tìm thấy dữ liệu giá năm ${targetHighYear} cho mã ${sym}`);
+    if (!chartData || chartData.highs.length === 0) {
+        throw new Error(`Không tìm thấy dữ liệu giá 365 ngày qua cho mã ${sym}`);
     }
 
-    const validHighs = highData.highs.filter((h) => Number.isFinite(h) && h > 0);
+    const validHighs = chartData.highs.filter((h) => Number.isFinite(h) && h > 0);
     if (validHighs.length === 0) {
-        throw new Error(`Dữ liệu giá năm ${targetHighYear} của mã ${sym} không hợp lệ`);
+        throw new Error(`Dữ liệu giá 365 ngày qua của mã ${sym} không hợp lệ`);
     }
 
     const rawHigh = Math.max(...validHighs);
     const yearHigh = normalizePrice(rawHigh);
 
-    // 2. Lấy giá hiện tại (năm nay hoặc nến mới nhất)
-    let currentData = await fetchFromVndirect(sym, fromCur, toCur);
-    if (!currentData) {
-        currentData = await fetchFromDnse(sym, fromCur, toCur);
-    }
-
+    // 2. Lấy giá hiện tại (nến đóng cửa mới nhất)
     let currentPrice = 0;
-    if (currentData && currentData.closes.length > 0) {
-        const latestClose = currentData.closes[currentData.closes.length - 1];
+    if (chartData.closes.length > 0) {
+        const latestClose = chartData.closes[chartData.closes.length - 1];
         currentPrice = normalizePrice(latestClose);
-    } else {
-        // Fallback về nến cuối của năm đỉnh nếu năm nay chưa có phiên
-        const lastHighClose = highData.closes[highData.closes.length - 1];
-        currentPrice = normalizePrice(lastHighClose);
     }
 
-    // 3. Tính mức giảm từ đỉnh
+    // 3. Tính mức giảm từ đỉnh 365 ngày
     const dropPercent = yearHigh > 0 ? ((currentPrice - yearHigh) / yearHigh) * 100 : 0;
 
     // 4. Xác định trạng thái DCA
@@ -127,7 +115,7 @@ async function fetchStockYearInfo(symbol: string, selectedYear: number): Promise
         currentPrice,
         yearHigh,
         dropPercent,
-        targetHighYear,
+        targetHighYear: new Date().getFullYear() - 1,
         dcaStatus,
         dropLevels,
     };
@@ -136,10 +124,6 @@ async function fetchStockYearInfo(symbol: string, selectedYear: number): Promise
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const symbolsParam = searchParams.get("symbols");
-    const yearParam = searchParams.get("year");
-
-    const currentYear = new Date().getFullYear();
-    const selectedYear = yearParam ? parseInt(yearParam, 10) : currentYear;
 
     if (!symbolsParam) {
         return NextResponse.json(
@@ -159,7 +143,7 @@ export async function GET(req: NextRequest) {
     await Promise.all(
         list.map(async (symbol) => {
             try {
-                const data = await fetchStockYearInfo(symbol, selectedYear);
+                const data = await fetchStockYearInfo(symbol);
                 results.push(data);
             } catch (err: any) {
                 console.error(`Lỗi lấy dữ liệu mã ${symbol}:`, err?.message || err);
@@ -176,8 +160,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
         success: true,
-        selectedYear,
-        targetHighYear: selectedYear - 1,
         data: results,
         errors,
     });

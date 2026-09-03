@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { Tooltip } from 'antd';
 import { StockYearInfo } from '../stockService';
-import { getDcaAnalysis, DcaAnalysisResult } from '@/utils/dcaCalculation';
+import { getDcaAnalysis, DcaAnalysisResult, getNextDcaTarget, NextDcaTargetResult } from '@/utils/dcaCalculation';
 import { StockTrackerDoc } from '@/services/stockFirebaseService';
 import { getTodayStock } from '@/utils/dailyStockPicker';
 
@@ -22,6 +23,7 @@ interface ScannerTableItem {
     yearHigh: number;
     dropPercent: number;
     signal: DcaAnalysisResult;
+    nextTarget: NextDcaTargetResult;
     docItem?: StockTrackerDoc;
 }
 
@@ -49,6 +51,15 @@ export default function DcaScannerView({
             todayDocItem?.dropLevels
         )
         : null;
+    const todayNextTarget = todayPick.symbol && todayPriceInfo
+        ? getNextDcaTarget(
+            todayPick.symbol,
+            todayPriceInfo.currentPrice,
+            todayPriceInfo.yearHigh,
+            todayDocItem?.dcaFilled,
+            todayDocItem?.dropLevels
+        )
+        : null;
 
     const tableData: ScannerTableItem[] = useMemo(() => {
         return symbols.map((sym) => {
@@ -65,6 +76,13 @@ export default function DcaScannerView({
                 docItem?.dcaFilled,
                 docItem?.dropLevels
             );
+            const nextTarget = getNextDcaTarget(
+                sym,
+                currentPrice,
+                yearHigh,
+                docItem?.dcaFilled,
+                docItem?.dropLevels
+            );
 
             return {
                 symbol: sym,
@@ -72,6 +90,7 @@ export default function DcaScannerView({
                 yearHigh,
                 dropPercent,
                 signal,
+                nextTarget,
                 docItem,
             };
         });
@@ -155,6 +174,11 @@ export default function DcaScannerView({
                                     <span className="text-xs text-gray-400 font-mono">
                                         Giảm từ đỉnh: <strong className="text-rose-400">{(todayPriceInfo?.dropPercent || 0).toFixed(2)}%</strong>
                                     </span>
+                                    {todayNextTarget && !todayNextTarget.allCompleted && (
+                                        <span className="text-xs text-gray-400 font-mono">
+                                            Mức mua kế tiếp: <strong className="text-amber-300">{todayNextTarget.targetDropPercent}% ({todayNextTarget.tierName})</strong> ~ <strong className="text-gray-200">{formatPrice(todayNextTarget.targetPrice)} ₫</strong>
+                                        </span>
+                                    )}
                                     {todaySignal && (
                                         todaySignal.type === 'ACTIVE' ? (
                                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 animate-pulse">
@@ -204,19 +228,20 @@ export default function DcaScannerView({
                                 <th className="py-3.5 px-4 text-right font-semibold">Giá hiện tại</th>
                                 <th className="py-3.5 px-4 text-right font-semibold">Đỉnh 2 năm (730 ngày)</th>
                                 <th className="py-3.5 px-4 text-right font-semibold">% Giảm từ đỉnh</th>
+                                <th className="py-3.5 px-4 text-center font-semibold">Mức % giảm sẽ mua</th>
                                 <th className="py-3.5 px-4 text-center font-semibold">Trạng thái tín hiệu</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-800/60 font-medium text-gray-200">
                             {tableData.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="py-8 text-center text-gray-500 font-mono text-xs">
+                                    <td colSpan={6} className="py-8 text-center text-gray-500 font-mono text-xs">
                                         Chưa có dữ liệu cổ phiếu
                                     </td>
                                 </tr>
                             ) : (
                                 tableData.map((item) => {
-                                    const { symbol, currentPrice, yearHigh, dropPercent, signal } = item;
+                                    const { symbol, currentPrice, yearHigh, dropPercent, signal, nextTarget } = item;
                                     const isDcaActive = signal.type === 'ACTIVE';
                                     const isTodayPick = todayPick.symbol === symbol;
 
@@ -267,6 +292,73 @@ export default function DcaScannerView({
                                                 {dropPercent > 0 ? `+${dropPercent.toFixed(2)}%` : `${dropPercent.toFixed(2)}%`}
                                             </td>
 
+                                            {/* Mức % giảm sẽ mua */}
+                                            <td className="py-3 px-4 text-center">
+                                                {nextTarget.allCompleted ? (
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                                        ✓ Đã mua 4 mốc
+                                                    </span>
+                                                ) : (
+                                                    <Tooltip
+                                                        title={
+                                                            <div className="text-xs p-1 space-y-1.5 font-sans">
+                                                                <div className="font-bold text-gray-200 border-b border-gray-700 pb-1 flex items-center justify-between">
+                                                                    <span>Lộ trình DCA ({symbol}):</span>
+                                                                    <span className="text-[10px] text-gray-400 font-normal">Đỉnh: {formatPrice(yearHigh)} ₫</span>
+                                                                </div>
+                                                                {nextTarget.levels.map((lvl) => (
+                                                                    <div
+                                                                        key={lvl.tierIndex}
+                                                                        className={`flex items-center justify-between gap-4 font-mono text-[11px] ${
+                                                                            lvl.isCurrentTarget
+                                                                                ? 'text-amber-300 font-bold bg-amber-500/10 px-1 py-0.5 rounded'
+                                                                                : lvl.isFilled
+                                                                                ? 'text-emerald-400 line-through opacity-60'
+                                                                                : 'text-gray-300'
+                                                                        }`}
+                                                                    >
+                                                                        <span>
+                                                                            {lvl.tierName} ({lvl.targetDropPercent}%):
+                                                                        </span>
+                                                                        <span>
+                                                                            {formatPrice(lvl.targetPrice)} ₫
+                                                                            {lvl.isFilled && ' (Đã khớp)'}
+                                                                            {lvl.isCurrentTarget && ' (Chuẩn bị mua)'}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        }
+                                                    >
+                                                        <div className="inline-flex flex-col items-center justify-center cursor-help">
+                                                            <div className="flex items-center gap-1.5 font-mono">
+                                                                <span className="text-sm font-bold text-amber-400 tabular-nums">
+                                                                    {nextTarget.targetDropPercent}%
+                                                                </span>
+                                                                <span className="text-[10px] font-sans font-semibold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                                                    {nextTarget.tierName}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-[11px] font-mono text-gray-400 mt-0.5">
+                                                                Giá: <strong className="text-gray-200 font-semibold">{formatPrice(nextTarget.targetPrice)} ₫</strong>
+                                                            </div>
+                                                            {nextTarget.isInZone ? (
+                                                                <span className="text-[10px] text-emerald-400 font-medium mt-0.5 flex items-center gap-1 animate-pulse">
+                                                                    <span className="w-1 h-1 rounded-full bg-emerald-400"></span>
+                                                                    Đang ở vùng mua (±2%)
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] text-gray-400 font-mono mt-0.5">
+                                                                    {nextTarget.gapPercent < 0
+                                                                        ? `Còn cách ${Math.abs(nextTarget.gapPercent).toFixed(1)}%`
+                                                                        : `Đã vượt qua`}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </Tooltip>
+                                                )}
+                                            </td>
+
                                             {/* Trạng thái tín hiệu: Chỉ có 2 trạng thái DCA hoặc Quan sát */}
                                             <td className="py-3 px-4 text-center">
                                                 {isDcaActive ? (
@@ -285,6 +377,7 @@ export default function DcaScannerView({
                                 })
                             )}
                         </tbody>
+
                     </table>
                 </div>
             </div>

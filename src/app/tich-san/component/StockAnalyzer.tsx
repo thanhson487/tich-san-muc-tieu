@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import DcaScannerView from './DcaScannerTab/DcaScannerView';
 import DashboardView from './DashboardTab/DashboardView';
 import MonthlyAssetView from './MonthlyAssetTab/MonthlyAssetView';
+import MacroCycleView from './MacroCycleTab/MacroCycleView';
 import {
     StockTrackerDoc,
     subscribeWatchlist,
@@ -20,7 +21,7 @@ export default function StockAnalyzer({ userId: propUserId }: StockAnalyzerProps
     const { userId: authUserId } = useAuthStore();
     const effectiveUserId = propUserId || authUserId || undefined;
 
-    const [activeTab, setActiveTab] = useState<'scanner' | 'dashboard' | 'monthly'>('scanner');
+    const [activeTab, setActiveTab] = useState<'scanner' | 'dashboard' | 'monthly' | 'macro'>('scanner');
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [watchlist, setWatchlist] = useState<StockTrackerDoc[]>([]);
     const [priceDataMap, setPriceDataMap] = useState<Record<string, StockYearInfo>>({});
@@ -138,6 +139,21 @@ export default function StockAnalyzer({ userId: propUserId }: StockAnalyzerProps
                         </svg>
                         3. Báo Cáo Tài Sản (Monthly Tracker)
                     </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('macro')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                            activeTab === 'macro'
+                                ? 'bg-[#1E222D] text-white border border-gray-700 shadow-md'
+                                : 'text-gray-400 hover:text-gray-200 hover:bg-[#131722]'
+                        }`}
+                    >
+                        <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 17a9 9 0 0118 0M12 17l4-6" />
+                        </svg>
+                        4. Chấm Điểm Vĩ Mô (Cycle Meter)
+                    </button>
                 </div>
 
                 {/* Tab 1: DCA Scanner */}
@@ -169,6 +185,9 @@ export default function StockAnalyzer({ userId: propUserId }: StockAnalyzerProps
                 {activeTab === 'monthly' && (
                     <MonthlyAssetView userId={effectiveUserId} />
                 )}
+
+                {/* Tab 4: Macro Cycle Meter */}
+                {activeTab === 'macro' && <MacroCycleView />}
             </div>
         </div>
     );

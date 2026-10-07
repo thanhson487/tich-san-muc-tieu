@@ -152,7 +152,7 @@ export default function StockAnalyzer({ userId: propUserId }: StockAnalyzerProps
                         <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 17a9 9 0 0118 0M12 17l4-6" />
                         </svg>
-                        4. Chấm Điểm Vĩ Mô (Cycle Meter)
+                        4. Investment Cycle Engine (Chu Kỳ & Định Giá)
                     </button>
                 </div>
 

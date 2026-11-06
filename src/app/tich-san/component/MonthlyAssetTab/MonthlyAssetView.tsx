@@ -48,6 +48,7 @@ import {
 } from '@/services/monthlyAssetService';
 import type { ColumnsType } from 'antd/es/table';
 import AssetGrowthStatsBlock, { ProcessedMonthlyAssetDoc } from './AssetGrowthStatsBlock';
+import AssetGrowthChart from './AssetGrowthChart';
 
 const ASSET_COLORS = {
     cash: '#f59e0b', // Vàng hổ phách (Tiền mặt - 20%)
@@ -147,11 +148,6 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
             momAssetDiff: 0,
         };
     }, [processedRecords, defaultPrevMonthStr]);
-
-    // Dữ liệu hiển thị cho Biểu đồ (1 năm gần nhất - 12 tháng)
-    const chartRecords = useMemo(() => {
-        return processedRecords.slice(-12);
-    }, [processedRecords]);
 
     // Bản ghi được chọn để hiển thị Biểu đồ tròn
     const pieRecord = useMemo(() => {
@@ -351,9 +347,8 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
                     </span>
                     {index > 0 && (
                         <div
-                            className={`text-[10px] font-mono tabular-nums ${
-                                record.momAssetGrowthPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                            }`}
+                            className={`text-[10px] font-mono tabular-nums ${record.momAssetGrowthPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                                }`}
                         >
                             {record.momAssetGrowthPercent >= 0
                                 ? `+${record.momAssetGrowthPercent.toFixed(1)}%`
@@ -376,9 +371,8 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
 
                 return (
                     <span
-                        className={`font-mono font-semibold text-xs tabular-nums ${
-                            isZero ? 'text-gray-400' : isPositive ? 'text-emerald-400' : 'text-amber-500'
-                        }`}
+                        className={`font-mono font-semibold text-xs tabular-nums ${isZero ? 'text-gray-400' : isPositive ? 'text-emerald-400' : 'text-amber-500'
+                            }`}
                     >
                         {isPositive ? `+${amount.toLocaleString('vi-VN')}` : amount.toLocaleString('vi-VN')} ₫
                     </span>
@@ -398,9 +392,8 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
                 return (
                     <div>
                         <div
-                            className={`font-mono font-bold text-xs tabular-nums ${
-                                isPositive ? 'text-emerald-400' : 'text-rose-400'
-                            }`}
+                            className={`font-mono font-bold text-xs tabular-nums ${isPositive ? 'text-emerald-400' : 'text-rose-400'
+                                }`}
                         >
                             {isPositive ? `+${profit.toLocaleString('vi-VN')}` : profit.toLocaleString('vi-VN')} ₫
                         </div>
@@ -573,68 +566,8 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
 
             {/* Khối Biểu đồ Trực quan */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Biểu đồ diện tích: Tăng trưởng tài sản */}
-                <div className="lg:col-span-2 p-5 rounded-xl border border-gray-800 bg-[#131722] shadow-xl flex flex-col justify-between" style={{ minHeight: 390 }}>
-                    <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                        <span className="text-gray-100 font-semibold text-sm flex items-center gap-2">
-                            <RiseOutlined style={{ color: '#6366f1' }} />
-                            Lộ trình tăng trưởng tổng tài sản (1 năm gần nhất)
-                        </span>
-                        <span className="text-xs text-gray-400 font-mono">
-                            {chartRecords.length} tháng ghi nhận
-                        </span>
-                    </div>
-
-                    {!mounted || chartRecords.length === 0 ? (
-                        <div className="h-[290px] flex items-center justify-center text-gray-500 text-xs font-mono">
-                            {loading ? 'Đang tải dữ liệu...' : 'Chưa có dữ liệu tài sản theo tháng. Hãy bấm "+ Ghi nhận số dư tháng" để bắt đầu!'}
-                        </div>
-                    ) : (
-                        <ResponsiveContainer width="100%" height={290}>
-                            <AreaChart data={chartRecords} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.6} />
-                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                                    </linearGradient>
-                                </defs>
-                                <XAxis
-                                    dataKey="month"
-                                    stroke="#64748b"
-                                    style={{ fontSize: 11, fontFamily: 'monospace' }}
-                                />
-                                <YAxis
-                                    stroke="#64748b"
-                                    style={{ fontSize: 11, fontFamily: 'monospace' }}
-                                    tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`}
-                                />
-                                <RechartsTooltip
-                                    formatter={(value: any) => [
-                                        `${Number(value).toLocaleString('vi-VN')} ₫`,
-                                        'Tổng tài sản',
-                                    ]}
-                                    contentStyle={{
-                                        backgroundColor: '#1E222D',
-                                        borderColor: '#374151',
-                                        borderRadius: 8,
-                                        color: '#fff',
-                                        fontFamily: 'monospace',
-                                    }}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="total"
-                                    stroke="#6366f1"
-                                    strokeWidth={2.5}
-                                    fillOpacity={1}
-                                    fill="url(#colorTotal)"
-                                    dot={{ r: 5, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }}
-                                    activeDot={{ r: 7, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    )}
-                </div>
+                {/* Biểu đồ tăng trưởng tài sản hiện đại (Đa chế độ xem & Thang đo động) */}
+                <AssetGrowthChart records={processedRecords} loading={loading} mounted={mounted} />
 
                 {/* Biểu đồ tròn: Cơ cấu tháng */}
                 <div className="p-5 rounded-xl border border-gray-800 bg-[#131722] shadow-xl flex flex-col justify-between" style={{ minHeight: 390 }}>

@@ -47,6 +47,7 @@ import {
     deleteMonthlyAsset,
 } from '@/services/monthlyAssetService';
 import type { ColumnsType } from 'antd/es/table';
+import AssetGrowthStatsBlock, { ProcessedMonthlyAssetDoc } from './AssetGrowthStatsBlock';
 
 const ASSET_COLORS = {
     cash: '#f59e0b', // Vàng hổ phách (Tiền mặt - 20%)
@@ -56,11 +57,6 @@ const ASSET_COLORS = {
 
 interface MonthlyAssetViewProps {
     userId?: string;
-}
-
-interface ProcessedMonthlyAssetDoc extends MonthlyAssetDoc {
-    investmentProfit: number;
-    profitPercent: number;
 }
 
 export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
@@ -95,7 +91,7 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
         return () => unsubscribe();
     }, [userId]);
 
-    // Xử lý tính toán P/L Đầu tư thực tế cho từng tháng
+    // Xử lý tính toán P/L Đầu tư thực tế và Tăng trưởng MoM cho từng tháng
     const processedRecords: ProcessedMonthlyAssetDoc[] = useMemo(() => {
         return records.map((current, index) => {
             const netFlow = current.netFlow !== undefined ? current.netFlow : 0;
@@ -106,6 +102,8 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
                     netFlow,
                     investmentProfit: 0,
                     profitPercent: 0,
+                    momAssetGrowthPercent: 0,
+                    momAssetDiff: 0,
                 };
             }
 
@@ -113,12 +111,16 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
             const investmentProfit = current.total - prev.total - netFlow;
             const baseCapital = prev.total + (netFlow > 0 ? netFlow : 0);
             const profitPercent = baseCapital > 0 ? (investmentProfit / baseCapital) * 100 : 0;
+            const momAssetDiff = current.total - prev.total;
+            const momAssetGrowthPercent = prev.total > 0 ? (momAssetDiff / prev.total) * 100 : 0;
 
             return {
                 ...current,
                 netFlow,
                 investmentProfit,
                 profitPercent,
+                momAssetGrowthPercent,
+                momAssetDiff,
             };
         });
     }, [records]);
@@ -141,6 +143,8 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
             netFlow: 0,
             investmentProfit: 0,
             profitPercent: 0,
+            momAssetGrowthPercent: 0,
+            momAssetDiff: 0,
         };
     }, [processedRecords, defaultPrevMonthStr]);
 
@@ -340,10 +344,24 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
             dataIndex: 'total',
             key: 'total',
             align: 'right',
-            render: (val: number) => (
-                <span className="font-mono font-bold text-white text-sm tabular-nums">
-                    {formatVND(val)}
-                </span>
+            render: (val: number, record: ProcessedMonthlyAssetDoc, index: number) => (
+                <div>
+                    <span className="font-mono font-bold text-white text-sm tabular-nums">
+                        {formatVND(val)}
+                    </span>
+                    {index > 0 && (
+                        <div
+                            className={`text-[10px] font-mono tabular-nums ${
+                                record.momAssetGrowthPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                            }`}
+                        >
+                            {record.momAssetGrowthPercent >= 0
+                                ? `+${record.momAssetGrowthPercent.toFixed(1)}%`
+                                : `${record.momAssetGrowthPercent.toFixed(1)}%`}{' '}
+                            MoM
+                        </div>
+                    )}
+                </div>
             ),
         },
         {
@@ -716,6 +734,9 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
                     )}
                 </div>
             </div>
+
+            {/* Block Phân Tích Tăng Trưởng & Hiệu Suất Sinh Lời (Tách riêng) */}
+            <AssetGrowthStatsBlock records={processedRecords} loading={loading} />
 
             {/* Bảng dữ liệu chi tiết */}
             <div className="overflow-hidden rounded-xl border border-gray-800 bg-[#131722] shadow-2xl">

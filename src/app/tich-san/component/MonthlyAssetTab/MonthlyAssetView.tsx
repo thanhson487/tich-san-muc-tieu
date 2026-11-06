@@ -347,8 +347,9 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
                     </span>
                     {index > 0 && (
                         <div
-                            className={`text-[10px] font-mono tabular-nums ${record.momAssetGrowthPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                                }`}
+                            className={`text-[10px] font-mono tabular-nums ${
+                                record.momAssetGrowthPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                            }`}
                         >
                             {record.momAssetGrowthPercent >= 0
                                 ? `+${record.momAssetGrowthPercent.toFixed(1)}%`
@@ -371,8 +372,9 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
 
                 return (
                     <span
-                        className={`font-mono font-semibold text-xs tabular-nums ${isZero ? 'text-gray-400' : isPositive ? 'text-emerald-400' : 'text-amber-500'
-                            }`}
+                        className={`font-mono font-semibold text-xs tabular-nums ${
+                            isZero ? 'text-gray-400' : isPositive ? 'text-emerald-400' : 'text-amber-500'
+                        }`}
                     >
                         {isPositive ? `+${amount.toLocaleString('vi-VN')}` : amount.toLocaleString('vi-VN')} ₫
                     </span>
@@ -392,8 +394,9 @@ export default function MonthlyAssetView({ userId }: MonthlyAssetViewProps) {
                 return (
                     <div>
                         <div
-                            className={`font-mono font-bold text-xs tabular-nums ${isPositive ? 'text-emerald-400' : 'text-rose-400'
-                                }`}
+                            className={`font-mono font-bold text-xs tabular-nums ${
+                                isPositive ? 'text-emerald-400' : 'text-rose-400'
+                            }`}
                         >
                             {isPositive ? `+${profit.toLocaleString('vi-VN')}` : profit.toLocaleString('vi-VN')} ₫
                         </div>
